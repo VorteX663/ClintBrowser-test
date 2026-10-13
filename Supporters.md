@@ -1,3 +1,4 @@
 List of people who have donated any amount:
 
-Babygirlcripwalker — Patreon
+- Babygirlcripwalker — Patreon
+- Daniel Rioja — PayPal
