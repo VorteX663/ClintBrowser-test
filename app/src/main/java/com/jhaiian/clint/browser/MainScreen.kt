@@ -172,7 +172,8 @@ internal fun MainScreen(activity: MainActivity, state: MainUiState) {
                 onClose = { activity.closeSearchOverlay() },
                 onSuggestionClick = { activity.onSuggestionChosen(it) },
                 onSuggestionDelete = { activity.onSuggestionHistoryDelete(it) },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                incognitoKeyboard = state.isIncognito && com.jhaiian.clint.privacy.IncognitoKeyboard.isEnabled(activity)
             )
         }
 
@@ -235,6 +236,15 @@ internal fun MainScreen(activity: MainActivity, state: MainUiState) {
             state.popupAlertRequest?.let { req ->
                 com.jhaiian.clint.browser.dialogs.PopupAlertDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.popupAlertRequest = null }
             }
+        }
+        state.cookiesControlRequest?.let { req ->
+            com.jhaiian.clint.browser.dialogs.CookiesControlDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.cookiesControlRequest = null }
+        }
+        state.cookiesControlExportRequest?.let { req ->
+            com.jhaiian.clint.browser.dialogs.CookiesControlExportDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.cookiesControlExportRequest = null }
+        }
+        state.cookiesControlImportRequest?.let { req ->
+            com.jhaiian.clint.browser.dialogs.CookiesControlImportDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.cookiesControlImportRequest = null }
         }
         state.refreshLinkDialogRequest?.let { req ->
             com.jhaiian.clint.browser.dialogs.RefreshLinkDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.refreshLinkDialogRequest = null }

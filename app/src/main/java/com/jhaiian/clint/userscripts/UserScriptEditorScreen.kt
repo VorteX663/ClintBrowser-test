@@ -180,6 +180,7 @@ private fun ScriptInfoSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val maxSheetHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.8f
     val runAtLabel = when (metadata.runAt) {
         "document-start" -> stringResource(R.string.user_scripts_run_at_start)
         "document-end" -> stringResource(R.string.user_scripts_run_at_end)
@@ -196,7 +197,7 @@ private fun ScriptInfoSheet(
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 520.dp)
+                .heightIn(max = maxSheetHeight)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {

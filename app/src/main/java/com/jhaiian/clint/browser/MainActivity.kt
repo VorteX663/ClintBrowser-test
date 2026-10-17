@@ -129,15 +129,6 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
     internal var cameraImageUri: android.net.Uri? = null
     internal var cameraVideoUri: android.net.Uri? = null
 
-    internal data class PendingDownload(
-        val url: String,
-        val filename: String,
-        val userAgent: String,
-        val referer: String,
-        val cookies: String
-    )
-
-    internal var pendingDownload: PendingDownload? = null
     internal var downloadDialogFolderPickerCallback: ((android.net.Uri) -> Unit)? = null
     internal var pendingWebPermissionRequest: android.webkit.PermissionRequest? = null
     internal var pendingWebMicPermissionRequest: android.webkit.PermissionRequest? = null
@@ -146,17 +137,6 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
     internal var pendingBridgeNotifCallbackId: String? = null
     internal var pendingBridgeNotifOrigin: String? = null
     internal var pendingBridgeNotifWebView: android.webkit.WebView? = null
-
-    internal val storagePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        val pending = pendingDownload
-        pendingDownload = null
-        if (granted && pending != null) {
-            ClintDownloadManager.enqueue(this, pending.url, pending.filename, pending.userAgent, pending.referer, pending.cookies)
-            showDownloadStartedSnackbar(pending.filename, com.jhaiian.clint.settings.downloads.DownloadSettingsKeys.MODE_DEFAULT, null)
-        }
-    }
 
     internal val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -310,7 +290,8 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         when (key) {
             "javascript_enabled" -> applyJavaScript()
             "block_third_party_cookies" -> applyCookiePolicy()
-            "do_not_track" -> applyDoNotTrackSettings()
+            "do_not_track", com.jhaiian.clint.privacy.PrivacyPrefs.GLOBAL_PRIVACY_CONTROL,
+            com.jhaiian.clint.privacy.PrivacyPrefs.REFERRER_TRIMMING, com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION -> applyDoNotTrackSettings()
             com.jhaiian.clint.browser.webview.ClintAutofill.PREF_AUTOFILL_ENABLED -> applyAutofillSettings()
             "custom_user_agent" -> applyUserAgent()
             "quiver_guard_enabled" -> onQuiverGuardEnabled(prefs.getBoolean("quiver_guard_enabled", false))
@@ -463,6 +444,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
     override fun onResume() {
         super.onResume()
         if (isFinishing) return
+        ClintDownloadManager.resumeTimeoutPaused(this)
         syncFramelessShortcuts()
         closeInactiveTabs()
         if (::swipeRefreshView.isInitialized) updateSwipeRefreshColors(uiState.isIncognito)
@@ -477,6 +459,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         uiState.homepageDesign = com.jhaiian.clint.browser.home.readHomepageDesign(this, prefs)
         uiState.homepageImageVersion = prefs.getLong(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_IMAGE_VERSION, 0L)
         uiState.homepageShowFavorites = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_FAVORITES, true)
+        uiState.homepageShowQuickActions = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_QUICK_ACTIONS, true)
         uiState.homepageShowRecent = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_RECENT, true)
         uiState.homepageCenterContent = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CENTER_CONTENT, true)
         val currentUserScriptsVersion = com.jhaiian.clint.userscripts.UserScriptState.getDataVersion(this)
@@ -852,6 +835,9 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         }
         applyDataSaverSiteState(tab, currentUrl)
         reloadActiveTabWithHeaders()
+    }
+    fun onMenuCookiesControl() {
+        openCookiesControl()
     }
     fun onMenuWebsiteBlocker() {
         val enabled = !prefs.getBoolean("website_blocker_enabled", false)

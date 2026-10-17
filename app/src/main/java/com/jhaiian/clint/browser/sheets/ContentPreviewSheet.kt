@@ -360,12 +360,10 @@ private fun showPreviewLinkFromWebView(webView: WebView, linkUrl: String, onPrev
 private fun buildPreviewUserAgent(context: android.content.Context, isDesktop: Boolean): String {
     val defaultUA = WebSettings.getDefaultUserAgent(context)
     val chromeVersion = Regex("Chrome/([\\d.]+)").find(defaultUA)?.groupValues?.get(1) ?: "134.0.0.0"
-    val androidVersion = android.os.Build.VERSION.RELEASE
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
     return when {
         isDesktop -> "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$chromeVersion Safari/537.36"
-        prefs.getBoolean("custom_user_agent", true) ->
-            "Mozilla/5.0 (Linux; Android $androidVersion; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$chromeVersion Mobile Safari/537.36"
+        prefs.getBoolean("custom_user_agent", true) -> com.jhaiian.clint.browser.webview.GenericUserAgent.mobile(defaultUA)
         else -> defaultUA
     }
 }

@@ -186,21 +186,8 @@ fun LookAndFeelPane(activity: SettingsActivity) {
     fun selectScrollHideMode(slotKind: String) {
         val position = uiState.addressBarPosition
         val mode = if (slotKind == "navigation_bar" && position == "bottom") "search_bar" else slotKind
-        if (mode == "off") {
-            applyScrollHideMode(mode)
-            uiState.openDialog = null
-            return
-        }
-        confirmDialog = ConfirmDialogConfig(
-            title = activity.getString(R.string.nested_scroll_warning_title),
-            message = activity.getString(R.string.nested_scroll_warning_message),
-            positiveLabel = activity.getString(R.string.action_enable_anyway),
-            onPositive = {
-                applyScrollHideMode(mode)
-                uiState.openDialog = null
-            },
-            negativeLabel = activity.getString(R.string.action_cancel)
-        )
+        applyScrollHideMode(mode)
+        uiState.openDialog = null
     }
 
     fun selectAddressBarPosition(newPosition: String) {
@@ -301,6 +288,9 @@ fun LookAndFeelPane(activity: SettingsActivity) {
         state = uiState,
         onThemeSelected = { newTheme -> uiState.openDialog = null; activity.captureAndRecreate(newTheme) },
         onAccentSelected = { newAccent -> uiState.openDialog = null; activity.captureAndApplyAccentColor(newAccent) },
+        onCustomThemesClicked = {
+            activity.startActivity(android.content.Intent(activity, com.jhaiian.clint.customtheme.CustomThemesActivity::class.java))
+        },
         onIntensitySelected = { newIntensity -> uiState.openDialog = null; activity.captureAndApplySurfaceIntensity(newIntensity) },
         onLanguageSelected = { newLanguage -> uiState.openDialog = null; activity.captureAndApplyLanguage(newLanguage) },
         onAddressBarPositionSelected = ::selectAddressBarPosition,
@@ -336,8 +326,10 @@ fun BrowserSettingsPane(activity: SettingsActivity) {
     val uiState = remember {
         BrowserSettingsUiState(
             initialHomepage = prefs.getString(PREF_HOMEPAGE, HOMEPAGE_CLINT) ?: HOMEPAGE_CLINT,
+            initialHomepageCustomUrl = prefs.getString(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CUSTOM_URL, "") ?: "",
             initialHomepageDesign = readHomepageDesign(activity, prefs),
             initialHomepageShowFavorites = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_FAVORITES, true),
+            initialHomepageShowQuickActions = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_QUICK_ACTIONS, true),
             initialHomepageShowRecent = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_RECENT, true),
             initialHomepageCenterContent = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CENTER_CONTENT, true),
             initialDeleteInactiveTabs = com.jhaiian.clint.tabs.InactiveTabsPolicy.normalize(prefs.getString(com.jhaiian.clint.tabs.InactiveTabsPolicy.PREF_DELETE_INACTIVE_TABS, null)),
@@ -363,8 +355,10 @@ fun BrowserSettingsPane(activity: SettingsActivity) {
 
     OnResume {
         uiState.homepage = prefs.getString(PREF_HOMEPAGE, HOMEPAGE_CLINT) ?: HOMEPAGE_CLINT
+        uiState.homepageCustomUrl = prefs.getString(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CUSTOM_URL, "") ?: ""
         uiState.homepageDesign = readHomepageDesign(activity, prefs)
         uiState.homepageShowFavorites = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_FAVORITES, true)
+        uiState.homepageShowQuickActions = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_QUICK_ACTIONS, true)
         uiState.homepageShowRecent = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_RECENT, true)
         uiState.homepageCenterContent = prefs.getBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CENTER_CONTENT, true)
         uiState.searchEngine = prefs.getString("search_engine", "duckduckgo") ?: "duckduckgo"
@@ -385,9 +379,13 @@ fun BrowserSettingsPane(activity: SettingsActivity) {
         uiState.customColorPicker = prefs.getBoolean("custom_color_picker_enabled", true)
     }
 
-    fun onHomepageConfirmed(selected: String) {
-        prefs.edit().putString(PREF_HOMEPAGE, selected).apply()
+    fun onHomepageConfirmed(selected: String, customUrl: String) {
+        prefs.edit()
+            .putString(PREF_HOMEPAGE, selected)
+            .putString(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CUSTOM_URL, customUrl)
+            .apply()
         uiState.homepage = selected
+        uiState.homepageCustomUrl = customUrl
         uiState.homepageDialogOpen = false
     }
 
@@ -437,6 +435,12 @@ fun BrowserSettingsPane(activity: SettingsActivity) {
         val newValue = !uiState.homepageShowFavorites
         prefs.edit().putBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_FAVORITES, newValue).apply()
         uiState.homepageShowFavorites = newValue
+    }
+
+    fun onHomepageShowQuickActionsClicked() {
+        val newValue = !uiState.homepageShowQuickActions
+        prefs.edit().putBoolean(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_SHOW_QUICK_ACTIONS, newValue).apply()
+        uiState.homepageShowQuickActions = newValue
     }
 
     fun onHomepageShowRecentClicked() {
@@ -578,6 +582,7 @@ fun BrowserSettingsPane(activity: SettingsActivity) {
         onHomepageDesignConfirmed = ::onHomepageDesignConfirmed,
         onHomepageImageRowClicked = ::launchHomepageImagePicker,
         onHomepageShowFavoritesClicked = ::onHomepageShowFavoritesClicked,
+        onHomepageShowQuickActionsClicked = ::onHomepageShowQuickActionsClicked,
         onHomepageShowRecentClicked = ::onHomepageShowRecentClicked,
         onHomepageCenterContentClicked = ::onHomepageCenterContentClicked,
         onDeleteInactiveTabsConfirmed = ::onDeleteInactiveTabsConfirmed,
@@ -621,6 +626,21 @@ fun PrivacySettingsPane(activity: SettingsActivity) {
             initialCustomUserAgent = prefs.getBoolean(PREF_CUSTOM_USER_AGENT, DEFAULT_CUSTOM_USER_AGENT),
             initialHttpsOnly = prefs.getBoolean(PREF_HTTPS_ONLY, DEFAULT_HTTPS_ONLY),
             initialDoNotTrack = prefs.getBoolean(PREF_DO_NOT_TRACK, DEFAULT_DO_NOT_TRACK),
+            initialStripTrackingParams = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.STRIP_TRACKING_PARAMS, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_STRIP_TRACKING_PARAMS),
+            initialGlobalPrivacyControl = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.GLOBAL_PRIVACY_CONTROL, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_GLOBAL_PRIVACY_CONTROL),
+            initialReferrerTrimming = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.REFERRER_TRIMMING, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_REFERRER_TRIMMING),
+            initialWebRtcProtection = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_WEBRTC_PROTECTION),
+            initialClearOnExit = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLEAR_ON_EXIT),
+            initialClearHistory = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_HISTORY, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLEAR_ON_EXIT_HISTORY),
+            initialClearCookies = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_COOKIES, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLEAR_ON_EXIT_COOKIES),
+            initialClearCache = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_CACHE, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLEAR_ON_EXIT_CACHE),
+            initialAppLock = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.APP_LOCK, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_APP_LOCK),
+            initialAppLockTimeout = prefs.getInt(com.jhaiian.clint.privacy.PrivacyPrefs.APP_LOCK_TIMEOUT, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_APP_LOCK_TIMEOUT),
+            initialScreenshotBlocking = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.SCREENSHOT_BLOCKING, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_SCREENSHOT_BLOCKING),
+            initialIncognitoKeyboard = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.INCOGNITO_KEYBOARD, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_INCOGNITO_KEYBOARD),
+            initialClipboardClearSeconds = prefs.getInt(com.jhaiian.clint.privacy.PrivacyPrefs.CLIPBOARD_CLEAR_SECONDS, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLIPBOARD_CLEAR_SECONDS),
+            hideStatusBar = prefs.getBoolean("hide_status_bar", false),
+            hideSystemNavigation = prefs.getBoolean("hide_system_navigation", false),
             initialAutofillEnabled = prefs.getBoolean(com.jhaiian.clint.browser.webview.ClintAutofill.PREF_AUTOFILL_ENABLED, com.jhaiian.clint.browser.webview.ClintAutofill.DEFAULT_AUTOFILL_ENABLED),
             initialAutofillServiceActive = com.jhaiian.clint.browser.webview.ClintAutofill.hasService(activity),
             autofillSupported = com.jhaiian.clint.browser.webview.ClintAutofill.isSupported(activity)
@@ -643,6 +663,44 @@ fun PrivacySettingsPane(activity: SettingsActivity) {
         onCustomUserAgentClick = { toggle(PREF_CUSTOM_USER_AGENT, uiState.customUserAgent) { uiState.customUserAgent = it } },
         onHttpsOnlyClick = { toggle(PREF_HTTPS_ONLY, uiState.httpsOnly) { uiState.httpsOnly = it } },
         onDoNotTrackClick = { toggle(PREF_DO_NOT_TRACK, uiState.doNotTrack) { uiState.doNotTrack = it } },
+        onStripTrackingParamsClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.STRIP_TRACKING_PARAMS, uiState.stripTrackingParams) { uiState.stripTrackingParams = it } },
+        onGlobalPrivacyControlClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.GLOBAL_PRIVACY_CONTROL, uiState.globalPrivacyControl) { uiState.globalPrivacyControl = it } },
+        onReferrerTrimmingClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.REFERRER_TRIMMING, uiState.referrerTrimming) { uiState.referrerTrimming = it } },
+        onWebRtcProtectionClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION, uiState.webRtcProtection) { uiState.webRtcProtection = it } },
+        onClearOnExitClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT, uiState.clearOnExit) { uiState.clearOnExit = it } },
+        onClearOnExitConfirmed = { history, cookies, cache ->
+            prefs.edit()
+                .putBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_HISTORY, history)
+                .putBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_COOKIES, cookies)
+                .putBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_CACHE, cache)
+                .apply()
+            uiState.clearHistory = history
+            uiState.clearCookies = cookies
+            uiState.clearCache = cache
+            uiState.clearOnExitDialogOpen = false
+        },
+        onAppLockClick = {
+            if (!uiState.appLock && !com.jhaiian.clint.backup.BackupAuthGate.isAuthenticationAvailable(activity)) {
+                android.widget.Toast.makeText(activity, R.string.app_lock_unavailable, android.widget.Toast.LENGTH_LONG).show()
+            } else {
+                toggle(com.jhaiian.clint.privacy.PrivacyPrefs.APP_LOCK, uiState.appLock) { uiState.appLock = it }
+            }
+        },
+        onAppLockTimeoutConfirmed = { seconds ->
+            prefs.edit().putInt(com.jhaiian.clint.privacy.PrivacyPrefs.APP_LOCK_TIMEOUT, seconds).apply()
+            uiState.appLockTimeout = seconds
+            uiState.appLockTimeoutDialogOpen = false
+        },
+        onScreenshotBlockingClick = {
+            toggle(com.jhaiian.clint.privacy.PrivacyPrefs.SCREENSHOT_BLOCKING, uiState.screenshotBlocking) { uiState.screenshotBlocking = it }
+            com.jhaiian.clint.privacy.PrivacyGuard.refreshScreenGuard(activity)
+        },
+        onIncognitoKeyboardClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.INCOGNITO_KEYBOARD, uiState.incognitoKeyboard) { uiState.incognitoKeyboard = it } },
+        onClipboardClearConfirmed = { seconds ->
+            prefs.edit().putInt(com.jhaiian.clint.privacy.PrivacyPrefs.CLIPBOARD_CLEAR_SECONDS, seconds).apply()
+            uiState.clipboardClearSeconds = seconds
+            uiState.clipboardDialogOpen = false
+        },
         onAutofillClick = { toggle(com.jhaiian.clint.browser.webview.ClintAutofill.PREF_AUTOFILL_ENABLED, uiState.autofillEnabled) { uiState.autofillEnabled = it } },
         onAutofillServiceClick = {
             if (!com.jhaiian.clint.browser.webview.ClintAutofill.openServicePicker(activity)) {

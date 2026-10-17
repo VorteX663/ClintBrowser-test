@@ -47,7 +47,7 @@ internal object UserScriptFetcher {
         } catch (_: Exception) {
             null
         }
-        val userAgent = WebSettings.getDefaultUserAgent(appContext)
+        val userAgent = com.jhaiian.clint.browser.webview.GenericUserAgent.resolve(appContext)
 
         val requestBuilder = Request.Builder()
             .url(url)

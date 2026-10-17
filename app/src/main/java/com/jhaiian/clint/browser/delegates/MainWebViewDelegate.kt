@@ -32,6 +32,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 @SuppressLint("SetJavaScriptEnabled")
 internal fun MainActivity.createWebView(isIncognito: Boolean, profileId: String = WebProfiles.DEFAULT_ID): WebView {
     val webView = ClintWebView(this)
+    webView.incognitoTab = isIncognito
     if (!isIncognito) WebProfiles.bind(webView, profileId)
     val settings = webView.settings
     settings.javaScriptEnabled = prefs.getBoolean("javascript_enabled", true)
@@ -211,11 +212,13 @@ internal fun MainActivity.buildRequestHeaders(url: String? = null): Map<String, 
     buildDesktopHeaders()?.let { headers.putAll(it) }
     if (isSaveDataActive(url)) headers["Save-Data"] = "on"
     if (isDoNotTrackActive()) headers["DNT"] = "1"
+    if (isGlobalPrivacyControlActive()) headers["Sec-GPC"] = "1"
     return if (headers.isEmpty()) null else headers
 }
 
 internal fun MainActivity.addDoNotTrackScript(tab: BrowserTab) {
     removeDoNotTrackScript(tab)
+    addPrivacyScripts(tab)
     if (!isDoNotTrackActive()) return
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
     doNotTrackScriptHandlers[tab.id] = WebViewCompat.addDocumentStartJavaScript(tab.webView, loadJsAsset("do_not_track.js"), setOf("*"))
@@ -223,6 +226,7 @@ internal fun MainActivity.addDoNotTrackScript(tab: BrowserTab) {
 
 internal fun MainActivity.removeDoNotTrackScript(tab: BrowserTab) {
     doNotTrackScriptHandlers.remove(tab.id)?.remove()
+    removePrivacyScripts(tab)
 }
 
 internal fun MainActivity.reloadActiveTabWithHeaders() {
@@ -255,12 +259,10 @@ internal fun MainActivity.removeSaveDataScript(tab: BrowserTab) {
 internal fun MainActivity.buildUserAgent(): String {
     val defaultUA = WebSettings.getDefaultUserAgent(this)
     val chromeVersion = Regex("Chrome/([\\d.]+)").find(defaultUA)?.groupValues?.get(1) ?: "134.0.0.0"
-    val androidVersion = android.os.Build.VERSION.RELEASE
     return when {
         isDesktopMode ->
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" + chromeVersion + " Safari/537.36"
-        prefs.getBoolean("custom_user_agent", true) ->
-            "Mozilla/5.0 (Linux; Android " + androidVersion + "; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" + chromeVersion + " Mobile Safari/537.36"
+        prefs.getBoolean("custom_user_agent", true) -> GenericUserAgent.mobile(defaultUA)
         else ->
             defaultUA
     }
@@ -357,6 +359,11 @@ internal fun MainActivity.applyUserAgentMetadata(webView: WebView) {
                 .setPlatform("Windows")
                 .build()
         )
+    } else if (prefs.getBoolean("custom_user_agent", true)) {
+        WebSettingsCompat.setUserAgentMetadata(
+            webView.settings,
+            GenericUserAgent.metadata(WebSettings.getDefaultUserAgent(this))
+        )
     } else {
         WebSettingsCompat.setUserAgentMetadata(
             webView.settings,
@@ -402,10 +409,12 @@ internal fun MainActivity.applyUserScripts() {
 
 internal fun MainActivity.getHomepageUrl(): String {
     val homepage = prefs.getString(com.jhaiian.clint.browser.home.PREF_HOMEPAGE, com.jhaiian.clint.browser.home.HOMEPAGE_CLINT)
-    return if (homepage == com.jhaiian.clint.browser.home.HOMEPAGE_SEARCH_ENGINE) {
-        getSearchEngineHomeUrl()
-    } else {
-        com.jhaiian.clint.browser.home.CLINT_HOME_URL
+    return when (homepage) {
+        com.jhaiian.clint.browser.home.HOMEPAGE_SEARCH_ENGINE -> getSearchEngineHomeUrl()
+        com.jhaiian.clint.browser.home.HOMEPAGE_CUSTOM -> com.jhaiian.clint.browser.home.normalizeCustomHomepageUrl(
+            prefs.getString(com.jhaiian.clint.browser.home.PREF_HOMEPAGE_CUSTOM_URL, "") ?: ""
+        ) ?: com.jhaiian.clint.browser.home.CLINT_HOME_URL
+        else -> com.jhaiian.clint.browser.home.CLINT_HOME_URL
     }
 }
 

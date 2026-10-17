@@ -28,5 +28,8 @@
 - [@Rohit-Bhadra](https://github.com/Rohit-Bhadra)
 - [@super585](https://github.com/super585)
 - [@HatoGreyrat](https://github.com/HatoGreyrat)
+- [@xmiseggs](https://github.com/xmiseggs)
+- [@Woallin](https://github.com/Woallin)
 - [u/Interesting-Stick641](https://www.reddit.com/user/Interesting-Stick641)
 - [u/ManFromUrth](https://www.reddit.com/user/ManFromUrth)
+- Daniel Rioja

@@ -112,6 +112,7 @@ internal data class BrowserMenuSnapshot(
     val openInAppEnabled: Boolean,
     val openInAppLabel: String?,
     val canCreateShortcut: Boolean,
+    val canUseCookiesControl: Boolean,
     val visibleMenuItems: List<CustomizableMenuItem>
 )
 
@@ -149,7 +150,8 @@ internal class BrowserMenuActions(
     val onOpenDataSaverSiteSettings: () -> Unit,
     val onDisableDataSaverForSite: () -> Unit,
     val onWebsiteBlocker: () -> Unit,
-    val onOpenWebsiteBlockerSettings: () -> Unit
+    val onOpenWebsiteBlockerSettings: () -> Unit,
+    val onCookiesControl: () -> Unit
 )
 
 internal fun MainActivity.buildMenuSnapshot(): BrowserMenuSnapshot {
@@ -198,6 +200,8 @@ internal fun MainActivity.buildMenuSnapshot(): BrowserMenuSnapshot {
         openInAppEnabled = appMatches.isNotEmpty(),
         openInAppLabel = openInAppLabel,
         canCreateShortcut = currentUrl.isNotEmpty(),
+        canUseCookiesControl = tabManager.activeTab?.isIncognito == false &&
+            (currentUrl.startsWith("http://") || currentUrl.startsWith("https://")),
         visibleMenuItems = BrowserMenuCustomizationStore.visibleOrderedItems(prefs)
     )
 }
@@ -236,7 +240,8 @@ internal fun MainActivity.buildMenuActions(dismiss: () -> Unit): BrowserMenuActi
     onOpenDataSaverSiteSettings = { dismiss(); onMenuOpenDataSaverSiteSettings() },
     onDisableDataSaverForSite = { dismiss(); onMenuDisableDataSaverForSite() },
     onWebsiteBlocker = { dismiss(); onMenuWebsiteBlocker() },
-    onOpenWebsiteBlockerSettings = { dismiss(); onMenuOpenWebsiteBlockerSettings() }
+    onOpenWebsiteBlockerSettings = { dismiss(); onMenuOpenWebsiteBlockerSettings() },
+    onCookiesControl = { dismiss(); onMenuCookiesControl() }
 )
 
 @Composable
@@ -308,7 +313,7 @@ private fun BrowserMenuBottomSheet(
 
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     val maxSheetHeight = if (isPortrait) {
-        (configuration.screenHeightDp.dp * 0.5f).coerceAtLeast(320.dp)
+        (configuration.screenHeightDp.dp * 0.8f).coerceAtLeast(320.dp)
     } else {
         (configuration.screenHeightDp.dp - 96.dp).coerceAtLeast(320.dp)
     }
@@ -469,6 +474,12 @@ private fun MenuItemRowFor(item: CustomizableMenuItem, snapshot: BrowserMenuSnap
             checked = snapshot.isDataSaverExceptionForSite,
             onClick = actions.onDisableDataSaverForSite,
             onLongClick = actions.onOpenDataSaverSiteSettings
+        )
+        CustomizableMenuItem.COOKIES_CONTROL -> MenuItemRow(
+            item.icon(),
+            stringResource(item.titleRes()),
+            enabled = snapshot.canUseCookiesControl,
+            onClick = actions.onCookiesControl
         )
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.WebAsset
 
 import androidx.compose.foundation.layout.padding
 import com.jhaiian.clint.ui.ClintSwitch
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -33,6 +34,7 @@ fun LookAndFeelScreen(
     state: LookAndFeelUiState,
     onThemeSelected: (String) -> Unit,
     onAccentSelected: (String) -> Unit,
+    onCustomThemesClicked: () -> Unit,
     onIntensitySelected: (String) -> Unit,
     onLanguageSelected: (String) -> Unit,
     onAddressBarPositionSelected: (String) -> Unit,
@@ -115,9 +117,21 @@ fun LookAndFeelScreen(
             SettingsRow(
                 icon = androidx.compose.material.icons.Icons.Filled.Brush,
                 title = stringResource(R.string.pref_accent_color_title),
-                summary = stringResource(accentSummaryRes(state.accent)),
+                summary = if (com.jhaiian.clint.customtheme.isCustomAccent(state.accent)) {
+                    com.jhaiian.clint.customtheme.customAccentLabel(androidx.compose.ui.platform.LocalContext.current, state.accent)
+                } else {
+                    stringResource(accentSummaryRes(state.accent))
+                },
                 colors = colors,
                 onClick = { state.openDialog = LookAndFeelDialog.ACCENT }
+            )
+            RowDivider(colors.divider)
+            SettingsRow(
+                icon = androidx.compose.material.icons.Icons.Filled.ColorLens,
+                title = stringResource(R.string.custom_themes_title),
+                summary = stringResource(R.string.custom_themes_row_summary),
+                colors = colors,
+                onClick = onCustomThemesClicked
             )
             RowDivider(colors.divider)
             SettingsRow(

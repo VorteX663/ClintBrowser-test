@@ -1,6 +1,6 @@
 # Privacy Policy for Clint Browser
 
-*Last updated: September 29, 2026*
+*Last updated: October 18, 2026*
 
 ## Overview
 
@@ -30,7 +30,45 @@ Clint Browser does not collect, store, transmit, or share any personal data. The
 
 ## Browsing Data
 
-All browsing data — including history, cookies, cached content, and site storage — is stored locally on your device only. You can clear this data at any time through your device's app settings. Incognito tabs do not save cookies, cached content, or browsing history to your device.
+All browsing data — including history, cookies, cached content, and site storage — is stored locally on your device only. You can clear this data at any time through your device's app settings. Incognito tabs do not save cookies, cached content, or browsing history to your device. You can also have the app delete selected data automatically when you close it, as described in Privacy and Security Settings below.
+
+---
+
+## Privacy and Security Settings
+
+Clint Browser has a **Privacy and Security** page in Settings with the options below. These settings are stored locally on your device and are applied entirely by the app on your device. None of them send information to the developer or to any server we operate.
+
+### Tracking Protection
+
+- **Strip tracking parameters** (on by default): Removes known tracking parameters, such as `utm_` and `fbclid`, from links before they load. The link is cleaned locally before the page is requested.
+- **Send Global Privacy Control** (on by default): Tells websites that you don't want your data sold or shared. This is only a request, and websites may choose to ignore it.
+- **Trim referrer** (on by default): When you follow a link, only the site address is shared with the destination instead of the full link of the page you came from.
+- **WebRTC leak protection** (off by default): Stops websites from discovering your real IP address through video call features. Some calls may not connect while this is on.
+
+These options reduce some kinds of tracking but cannot stop all of it. Websites can still recognize you through other means, such as browser fingerprinting, accounts you sign in to, or your IP address. Because page loading is handled by your WebView provider, how it behaves internally is outside our control.
+
+### Data and Device Protection
+
+- **App lock** (off by default): Requires your fingerprint, face, or screen lock (PIN, pattern, or password) to open the app. When on, a **Lock after** option lets you choose Immediately, 1 minute (default), 5 minutes, or 15 minutes. Android performs the check locally and only tells the app whether it succeeded. Clint Browser never sees, receives, or stores your biometric data or device credentials.
+- **Block screenshots** (off by default): Prevents screenshots and screen recording inside the app and hides the app preview in your recent apps list. This uses Android's secure window feature. It cannot stop someone from photographing your screen with another device, and behavior may vary on some devices.
+- **Incognito keyboard** (on by default): Asks your keyboard not to learn what you type in Incognito Mode. This is a request made through Android, and a keyboard app may choose to ignore it.
+- **Auto-clear clipboard** (off by default): After you copy something while using Clint Browser, clears the clipboard after 30 seconds, 1 minute, or 5 minutes, as long as the clipboard content hasn't changed in the meantime. This relies on the app still running, so if Android closes the app before the timer ends, the clipboard may not be cleared.
+- **Clear data on exit** (off by default): Deletes the data you select when you close the app. A **Data to clear** option lets you choose any of **Browsing history**, **Cookies and site data**, and **Cache**, all of which are selected by default. Bookmarks, downloads, and settings are not affected. If the app is closed in a way that doesn't let the cleanup finish, such as being force-stopped, the cleanup is completed the next time you open the app.
+
+---
+
+## Custom Themes
+
+The custom theme editor lets you change the colors used throughout the app, preview them live while you edit, and save, rename, edit, apply, and reuse your themes. Your themes, including their names and colors, are stored locally on your device. They are never uploaded or synced anywhere by Clint Browser.
+
+---
+
+## Homepage
+
+You can customize the homepage in Settings.
+
+- **Quick actions.** You can hide the quick actions on the homepage. This preference is stored locally on your device.
+- **Custom homepage URL.** You can set your own web address as the homepage. The address is stored locally on your device. When the homepage opens, Clint Browser loads that address the same way it would load any website, so that site can see your IP address and may set cookies or collect data under its own privacy policy. Only use a homepage you trust.
 
 ---
 
@@ -114,13 +152,15 @@ In short: your backups never leave your control unless you move them somewhere y
 
 ## Downloads
 
-Files you download are saved directly to your device. Clint Browser does not upload, scan, or transmit downloaded files.
+Files you download are saved directly to your device. Clint Browser does not upload, scan, or transmit downloaded files. Download details, such as progress and the segment information shown in a download's Properties dialog, are stored locally on your device and are never transmitted.
 
 ---
 
 ## Media Capture
 
 Media Capture detects media resources used by websites, such as video, audio, subtitles, and streaming formats like HLS/M3U8 and DASH, and lets you download them directly. For example, when a page plays a video, Media Capture inspects the page and its network requests to find available media streams and lists them as downloadable options. Some sites serve video and audio as separate streams, and where supported, Media Capture can combine them into a single file.
+
+**Combining video and audio.** Some sites deliver a video with no sound as one stream and the audio as a separate track. When you choose to combine them, Clint Browser downloads both streams and merges them into a single playable video file on your device. The merge is done locally using your device's media components, either through the hardware codec or the software codec depending on your codec setting, and nothing is sent to an external server.
 
 All of this detection happens locally on your device. Clint Browser does not intentionally upload captured media, browsing data, or any information about detected media to an external server.
 
@@ -230,7 +270,7 @@ Clint Browser requests the following permissions:
 - **QUERY_ALL_PACKAGES** – Detects which apps on your device can handle special links, like opening a phone number in your dialer or a store link in the Play Store.
 - **FOREGROUND_SERVICE** – Keeps downloading files even when you switch to another app.
 - **FOREGROUND_SERVICE_DATA_SYNC** – Works with `FOREGROUND_SERVICE` to tell Android the background activity is a file download.
-- **FOREGROUND_SERVICE_MEDIA_PROCESSING** – Works with `FOREGROUND_SERVICE` to tell Android the background activity is processing a downloaded video stream, such as combining its segments into a single file.
+- **FOREGROUND_SERVICE_MEDIA_PROCESSING** – Works with `FOREGROUND_SERVICE` to tell Android the background activity is processing a downloaded video stream, such as combining its segments into a single file or merging a video with a separate audio track.
 
 ## Power & Background
 - **REQUEST_IGNORE_BATTERY_OPTIMIZATIONS** – Prevents Android from pausing downloads when the device is in battery saver or Doze mode.
@@ -243,7 +283,7 @@ No permission is used for tracking or data collection.
 
 ## Data Retention and Deletion
 
-Since no personal data is collected by the developer, there is nothing to delete on our servers. All local data (history, bookmarks, downloads, etc.) is stored on your device. You can delete any or all of it at any time through the app’s settings or by clearing the app’s storage in your device settings.
+Since no personal data is collected by the developer, there is nothing to delete on our servers. All local data (history, bookmarks, downloads, etc.) is stored on your device. You can delete any or all of it at any time through the app’s settings, by turning on Clear data on exit, or by clearing the app’s storage in your device settings.
 
 ---
 
@@ -257,7 +297,7 @@ Clint Browser does not knowingly collect any personal information from anyone, i
 
 Clint Browser does not include analytics, advertising, or tracking SDKs.
 
-However, the search engine or services you choose (such as DuckDuckGo, Brave Search, Ecosia, Google, or a custom one you configure) may collect data according to their own privacy policies. Clint Browser has no control over those services. Additionally, the search suggestions feature uses DuckDuckGo's or Google's public suggestion API, or a custom one you configure, depending on which provider you've selected, and the favicon fallback feature uses DuckDuckGo's public API, as described above. Any user scripts you install can also communicate with third party services on their own, as described in the User Scripts section above.
+However, the search engine or services you choose (such as DuckDuckGo, Brave Search, Ecosia, Google, or a custom one you configure) may collect data according to their own privacy policies. Clint Browser has no control over those services. Additionally, the search suggestions feature uses DuckDuckGo's or Google's public suggestion API, or a custom one you configure, depending on which provider you've selected, and the favicon fallback feature uses DuckDuckGo's public API, as described above. Any user scripts you install can also communicate with third party services on their own, as described in the User Scripts section above. If you set a custom homepage, that website is also a third party and is subject to its own privacy policy.
 
 ---
 

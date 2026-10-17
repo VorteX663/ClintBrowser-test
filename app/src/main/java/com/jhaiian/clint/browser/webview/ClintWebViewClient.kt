@@ -166,6 +166,18 @@ class ClintWebViewClient(
             }
         }
 
+        if (request.isForMainFrame && request.method.equals("GET", ignoreCase = true) &&
+            prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.STRIP_TRACKING_PARAMS, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_STRIP_TRACKING_PARAMS)
+        ) {
+            val original = uri.toString()
+            val cleaned = com.jhaiian.clint.privacy.TrackingParams.strip(original)
+            if (cleaned != original) {
+                val headers = getDesktopHeaders()
+                if (headers != null) view.loadUrl(cleaned, headers) else view.loadUrl(cleaned)
+                return true
+            }
+        }
+
         if (request.isForMainFrame && tryOpenInApp(view, uri)) return true
 
         if (request.isForMainFrame) {

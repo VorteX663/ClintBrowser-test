@@ -75,7 +75,7 @@ internal object UserScriptUpdateChecker {
             } catch (_: Exception) {
                 null
             }
-            val userAgent = WebSettings.getDefaultUserAgent(context)
+            val userAgent = com.jhaiian.clint.browser.webview.GenericUserAgent.resolve(context)
 
             val requestBuilder = Request.Builder()
                 .url(url)

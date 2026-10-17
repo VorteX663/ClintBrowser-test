@@ -40,7 +40,8 @@ enum class CustomizableMenuItem(val id: String) {
     READER_MODE("reader_mode"),
     DESKTOP_MODE("desktop_mode"),
     DATA_SAVER("data_saver"),
-    DISABLE_DATA_SAVER_FOR_SITE("disable_data_saver_for_site");
+    DISABLE_DATA_SAVER_FOR_SITE("disable_data_saver_for_site"),
+    COOKIES_CONTROL("cookies_control");
 
     companion object {
         val DEFAULT_ORDER: List<CustomizableMenuItem> = entries.toList()
@@ -67,6 +68,7 @@ fun CustomizableMenuItem.icon(): ImageVector = when (this) {
     CustomizableMenuItem.DESKTOP_MODE -> Icons.Filled.DesktopWindows
     CustomizableMenuItem.DATA_SAVER -> Icons.Filled.DataSaverOn
     CustomizableMenuItem.DISABLE_DATA_SAVER_FOR_SITE -> Icons.Filled.DataSaverOff
+    CustomizableMenuItem.COOKIES_CONTROL -> CookieIcon
 }
 
 fun CustomizableMenuItem.titleRes(): Int = when (this) {
@@ -88,6 +90,7 @@ fun CustomizableMenuItem.titleRes(): Int = when (this) {
     CustomizableMenuItem.DESKTOP_MODE -> R.string.desktop_mode
     CustomizableMenuItem.DATA_SAVER -> R.string.menu_data_saver
     CustomizableMenuItem.DISABLE_DATA_SAVER_FOR_SITE -> R.string.menu_disable_data_saver_for_site
+    CustomizableMenuItem.COOKIES_CONTROL -> R.string.menu_cookies_control
 }
 
 object BrowserMenuCustomizationStore {

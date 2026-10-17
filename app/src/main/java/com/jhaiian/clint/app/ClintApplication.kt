@@ -27,6 +27,7 @@ class ClintApplication : Application() {
         SystemDarkState.install(this)
         loadMeasurementSystemPreference(this)
         DataSaverMode.register(this)
+        com.jhaiian.clint.privacy.PrivacyGuard.install(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {}

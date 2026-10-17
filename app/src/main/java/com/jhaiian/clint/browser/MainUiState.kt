@@ -44,6 +44,7 @@ internal class MainUiState {
     var homepageDesign by mutableStateOf("plain")
     var homepageImageVersion by mutableLongStateOf(0L)
     var homepageShowFavorites by mutableStateOf(true)
+    var homepageShowQuickActions by mutableStateOf(true)
     var homepageShowRecent by mutableStateOf(true)
     var homepageCenterContent by mutableStateOf(true)
 
@@ -60,6 +61,10 @@ internal class MainUiState {
 
     var topBarFraction by mutableFloatStateOf(0f)
     var bottomBarFraction by mutableFloatStateOf(0f)
+
+    var topBarAnimating: Boolean = false
+    var bottomBarAnimating: Boolean = false
+    var barsTargetHidden: Boolean = false
 
     var topBarFullHeightPx by mutableIntStateOf(0)
     var bottomBarFullHeightPx by mutableIntStateOf(0)
@@ -92,6 +97,9 @@ internal class MainUiState {
     var popupAlertRequest by mutableStateOf<com.jhaiian.clint.browser.dialogs.PopupAlertRequest?>(null)
     var refreshLinkDialogRequest by mutableStateOf<com.jhaiian.clint.browser.dialogs.RefreshLinkDialogRequest?>(null)
     var profilePickerOpen by mutableStateOf(false)
+    var cookiesControlRequest by mutableStateOf<com.jhaiian.clint.browser.dialogs.CookiesControlRequest?>(null)
+    var cookiesControlExportRequest by mutableStateOf<com.jhaiian.clint.browser.dialogs.CookiesControlExportRequest?>(null)
+    var cookiesControlImportRequest by mutableStateOf<com.jhaiian.clint.browser.dialogs.CookiesControlImportRequest?>(null)
     var createShortcutRequest by mutableStateOf<com.jhaiian.clint.browser.dialogs.CreateShortcutRequest?>(null)
     var openInAppRequest by mutableStateOf<com.jhaiian.clint.browser.webview.OpenInAppRequest?>(null)
     var userScriptInstallPromptRequest by mutableStateOf<com.jhaiian.clint.userscripts.UserScriptInstallPromptRequest?>(null)

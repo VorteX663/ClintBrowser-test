@@ -6,8 +6,10 @@ import androidx.compose.runtime.setValue
 
 class BrowserSettingsUiState(
     initialHomepage: String,
+    initialHomepageCustomUrl: String,
     initialHomepageDesign: String,
     initialHomepageShowFavorites: Boolean,
+    initialHomepageShowQuickActions: Boolean,
     initialHomepageShowRecent: Boolean,
     initialHomepageCenterContent: Boolean,
     initialDeleteInactiveTabs: String,
@@ -29,8 +31,10 @@ class BrowserSettingsUiState(
     initialCustomColorPicker: Boolean
 ) {
     var homepage by mutableStateOf(initialHomepage)
+    var homepageCustomUrl by mutableStateOf(initialHomepageCustomUrl)
     var homepageDesign by mutableStateOf(initialHomepageDesign)
     var homepageShowFavorites by mutableStateOf(initialHomepageShowFavorites)
+    var homepageShowQuickActions by mutableStateOf(initialHomepageShowQuickActions)
     var homepageShowRecent by mutableStateOf(initialHomepageShowRecent)
     var homepageCenterContent by mutableStateOf(initialHomepageCenterContent)
     var deleteInactiveTabs by mutableStateOf(initialDeleteInactiveTabs)

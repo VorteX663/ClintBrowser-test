@@ -1,13 +1,9 @@
 package com.jhaiian.clint.browser.delegates
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
 import com.jhaiian.clint.R
@@ -124,34 +120,11 @@ private fun MainActivity.doEnqueueDownload(
     onRename: () -> Unit,
     onStarted: () -> Unit
 ) {
-    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-        checkConflictAndEnqueue(url, filename, userAgent, referer, cookies, retryEnabled, unmeteredOnly, splitParts, multithreadingParts, speedLimitBytesPerSec, locationMode, customLocationUri, categorizeEnabled, scheduledStartAtMillis, onDismiss, onRename, onStarted)
-        return
-    }
-
-    if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        == PackageManager.PERMISSION_GRANTED
-    ) {
-        checkConflictAndEnqueue(url, filename, userAgent, referer, cookies, retryEnabled, unmeteredOnly, splitParts, multithreadingParts, speedLimitBytesPerSec, locationMode, customLocationUri, categorizeEnabled, scheduledStartAtMillis, onDismiss, onRename, onStarted)
-        return
-    }
-
-    pendingDownload = MainActivity.PendingDownload(url, filename, userAgent, referer, cookies)
-
-    uiState.confirmDialogConfig = com.jhaiian.clint.ui.listscreen.ConfirmDialogConfig(
-        title = getString(R.string.download_storage_permission_title),
-        message = getString(R.string.download_storage_permission_message),
-        positiveLabel = getString(R.string.action_allow),
-        onPositive = {
-            onDismiss()
-            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        },
-        negativeLabel = getString(R.string.action_cancel),
-        onNegative = {
-            pendingDownload = null
-            onDismiss()
+    if (ClintDownloadManager.requestStoragePermissionIfNeeded(this, locationMode) {
+            doEnqueueDownload(url, filename, userAgent, referer, cookies, retryEnabled, unmeteredOnly, splitParts, multithreadingParts, speedLimitBytesPerSec, locationMode, customLocationUri, categorizeEnabled, scheduledStartAtMillis, onDismiss, onRename, onStarted)
         }
-    )
+    ) return
+    checkConflictAndEnqueue(url, filename, userAgent, referer, cookies, retryEnabled, unmeteredOnly, splitParts, multithreadingParts, speedLimitBytesPerSec, locationMode, customLocationUri, categorizeEnabled, scheduledStartAtMillis, onDismiss, onRename, onStarted)
 }
 
 private fun MainActivity.checkConflictAndEnqueue(

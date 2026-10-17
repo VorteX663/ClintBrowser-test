@@ -1,5 +1,6 @@
 package com.jhaiian.clint.base
 
+import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -11,6 +12,7 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.WindowCompat
@@ -21,7 +23,8 @@ import com.jhaiian.clint.app.ClintApplication
 import com.jhaiian.clint.ui.ThemeRevealHolder
 import com.jhaiian.clint.ui.ThemeRevealOverlay
 import com.jhaiian.clint.ui.theme.ThemeMode
-import com.jhaiian.clint.ui.theme.resolveClintTheme
+import com.jhaiian.clint.customtheme.CUSTOM_THEME_REVISION_PREF
+import com.jhaiian.clint.customtheme.resolveThemeChrome
 import com.jhaiian.clint.util.LocaleHelper
 import kotlin.math.hypot
 import kotlin.math.max
@@ -31,8 +34,23 @@ abstract class ClintActivity : AppCompatActivity() {
     private var appliedTheme: String? = null
     private var appliedAccent: String? = null
     private var appliedIntensity: String? = null
+    private var appliedCustomRevision = 0L
     private var appliedLanguage: String? = null
     private var appliedSystemDark = false
+    private var storagePermissionCallback: ((Boolean) -> Unit)? = null
+
+    private val legacyStoragePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val callback = storagePermissionCallback
+        storagePermissionCallback = null
+        callback?.invoke(granted)
+    }
+
+    fun requestLegacyStoragePermission(onResult: (Boolean) -> Unit) {
+        storagePermissionCallback = onResult
+        legacyStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.wrapContext(newBase))
@@ -43,6 +61,7 @@ abstract class ClintActivity : AppCompatActivity() {
         appliedTheme = prefs.getString("app_theme", "system") ?: "system"
         appliedAccent = prefs.getString("accent_color", "material_you") ?: "material_you"
         appliedIntensity = prefs.getString("surface_intensity", "soft_tint") ?: "soft_tint"
+        appliedCustomRevision = prefs.getLong(CUSTOM_THEME_REVISION_PREF, 0L)
         appliedLanguage = prefs.getString(LocaleHelper.PREF_APP_LANGUAGE, LocaleHelper.LANGUAGE_SYSTEM) ?: LocaleHelper.LANGUAGE_SYSTEM
         appliedSystemDark = ThemeMode.isSystemDark()
         applyWindowChrome()
@@ -74,7 +93,8 @@ abstract class ClintActivity : AppCompatActivity() {
         val currentAccent = prefs.getString("accent_color", "material_you") ?: "material_you"
         val currentIntensity = prefs.getString("surface_intensity", "soft_tint") ?: "soft_tint"
         val currentLanguage = prefs.getString(LocaleHelper.PREF_APP_LANGUAGE, LocaleHelper.LANGUAGE_SYSTEM) ?: LocaleHelper.LANGUAGE_SYSTEM
-        if (currentTheme != appliedTheme || currentAccent != appliedAccent || currentIntensity != appliedIntensity || currentLanguage != appliedLanguage) {
+        val currentRevision = prefs.getLong(CUSTOM_THEME_REVISION_PREF, 0L)
+        if (currentTheme != appliedTheme || currentAccent != appliedAccent || currentIntensity != appliedIntensity || currentRevision != appliedCustomRevision || currentLanguage != appliedLanguage) {
             window.setWindowAnimations(0)
             recreate()
             return
@@ -93,13 +113,13 @@ abstract class ClintActivity : AppCompatActivity() {
         val theme = appliedTheme ?: "system"
         val accent = appliedAccent ?: "material_you"
         val intensity = appliedIntensity ?: "soft_tint"
-        val resolved = resolveClintTheme(this, theme, accent, intensity)
-        window.setBackgroundDrawable(ColorDrawable(resolved.background.toArgb()))
-        window.statusBarColor = resolved.statusBar.toArgb()
-        window.navigationBarColor = resolved.navigationBar.toArgb()
+        val chrome = resolveThemeChrome(this, theme, accent, intensity)
+        window.setBackgroundDrawable(ColorDrawable(chrome.background))
+        window.statusBarColor = chrome.statusBar
+        window.navigationBarColor = chrome.navigationBar
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.isAppearanceLightStatusBars = resolved.isLight
-        controller.isAppearanceLightNavigationBars = resolved.isLight
+        controller.isAppearanceLightStatusBars = chrome.lightStatusBar
+        controller.isAppearanceLightNavigationBars = chrome.lightNavigationBar
     }
 
     fun captureAndRecreate(newTheme: String) {
@@ -133,6 +153,12 @@ abstract class ClintActivity : AppCompatActivity() {
         if (current == newIntensity) return
         captureScreenBitmap()
         prefs.edit().putString("surface_intensity", newIntensity).commit()
+        window.setWindowAnimations(0)
+        recreate()
+    }
+
+    fun captureAndRecreateForCustomTheme() {
+        captureScreenBitmap()
         window.setWindowAnimations(0)
         recreate()
     }

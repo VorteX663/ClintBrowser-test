@@ -32,6 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jhaiian.clint.R
+import com.jhaiian.clint.customtheme.CustomThemeRepository
+import com.jhaiian.clint.customtheme.ThemeSlot
+import com.jhaiian.clint.customtheme.customAccentFor
+import androidx.compose.ui.text.style.TextOverflow
 import com.jhaiian.clint.ui.ClintDialog
 import com.jhaiian.clint.ui.scrollToSelection
 import com.jhaiian.clint.settings.common.SettingsPickerOptionBottomSpacing
@@ -94,11 +98,48 @@ fun ThemeSelectorDialog(current: String, hideStatusBar: Boolean, hideSystemNavig
 }
 
 @Composable
+private fun AccentSectionLabel(text: String) {
+    Text(
+        text,
+        color = LocalClintColors.current.primary,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 24.dp, top = 4.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
 fun AccentColorDialog(current: String, theme: String, hideStatusBar: Boolean, hideSystemNavigation: Boolean, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
     val colors = LocalClintColors.current
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     ClintDialog(title = stringResource(R.string.pref_accent_color_title), hideStatusBar = hideStatusBar, hideSystemNavigation = hideSystemNavigation, onDismiss = onDismiss, scrollState = scrollState) {
+        val customThemes = remember { CustomThemeRepository.all(context) }
+        if (customThemes.isNotEmpty()) {
+            AccentSectionLabel(stringResource(R.string.custom_themes_title))
+            customThemes.forEach { theme ->
+                val key = customAccentFor(theme.id)
+                val palette = theme.palette(colors.isLight)
+                SelectableCard(
+                    selected = current == key, onClick = { onSelect(key) },
+                    cardBackground = colors.surfaceVariant, primary = colors.primary,
+                    contentPadding = OptionContentPadding, bottomSpacing = OptionBottomSpacing,
+                    modifier = Modifier.scrollToSelection(scrollState, current == key)
+                ) {
+                    AccentSwatch(palette.color(ThemeSlot.BACKGROUND), palette.color(ThemeSlot.SURFACE), palette.color(ThemeSlot.PRIMARY))
+                    Column(Modifier.weight(1f).padding(start = 16.dp, end = 8.dp)) {
+                        Text(theme.name, color = colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            theme.description.ifBlank { stringResource(R.string.custom_theme_tap_to_apply) },
+                            color = colors.secondaryText, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    CheckSlot(current == key, colors.primary)
+                }
+            }
+            AccentSectionLabel(stringResource(R.string.accent_section_presets))
+        }
         data class AccentOption(val key: String, val titleRes: Int, val descRes: Int)
         listOf(
             AccentOption("material_you", R.string.accent_material_you, R.string.accent_material_you_desc),

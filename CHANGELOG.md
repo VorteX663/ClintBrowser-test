@@ -4,6 +4,102 @@ All notable changes to Clint Browser are documented here.
 
 ---
 
+# v1.2.1
+
+## What's New
+
+### Custom Theme
+
+Added a custom theme editor that allows users to individually customize all colors used throughout the app. Include a real-time preview that updates instantly as colors are changed, so users can see the results before applying the theme. Allow users to save, rename, edit, apply, and reuse their custom themes.
+
+Thank you to Daniel Rioja for suggesting this.
+
+---
+
+### Media Capture
+
+Added support for combining muted video streams with separate audio tracks in Media Capture, allowing users to merge them into a single playable video with audio.
+
+If the video has no audio or playback is glitchy, try switching to the software codec. I've received a lot of reports about these issues, and in most cases, I've had to tell users to switch to the software codec because their device's hardware may not properly support the specific codec.
+
+Thank you to @reviewlord for suggesting this [#71](https://github.com/jhaiian/ClintBrowser/issues/71)
+
+---
+
+### Advanced Download Manager
+
+- Handling a foreground timeout properly.
+- The Properties dialog will now display the current downloaded segment / total download segments.
+- Also the segment average size.
+- Made muxing have a real progress percentage tracker instead of being indeterminate.
+
+---
+
+## Privacy And Security
+
+### Tracking protection
+
+- **Strip tracking parameters** (on): Removes trackers like `utm_` and `fbclid` from links before they load. On or off.
+- **Send Global Privacy Control** (on): Asks websites not to sell or share your data. Websites may choose to ignore it. On or off.
+- **Trim referrer** (on): Shares only the site address, not the full page link, when you follow a link. On or off.
+- **WebRTC leak protection** (on in Gecko, off in Browser): Stops websites from finding your real IP address through video call features. Browser adds "Some calls may not connect". On or off.
+
+### Data and device protection
+
+- **App lock** (off): Require your fingerprint, face, or screen lock to open the app. When on, a **Lock after** row appears with these options:
+  - Immediately
+  - 1 minute (default)
+  - 5 minutes
+  - 15 minutes
+- **Block screenshots** (off): Prevents screenshots and screen recording, and hides the app preview in recent apps. On or off.
+- **Incognito keyboard** (on): Asks your keyboard not to learn what you type in Incognito Mode. On or off.
+- **Auto-clear clipboard** (off): Opens a picker with these options:
+  - Off
+  - After 30 seconds
+  - After 1 minute
+  - After 5 minutes
+- **Clear data on exit** (off): Deletes the selected data when you close the app. When on, a **Data to clear** row opens a checklist, with all three ticked by default:
+  - Browsing history
+  - Cookies and site data
+  - Cache
+
+(Thanks to @super585 for suggesting this [#81](https://github.com/jhaiian/ClintBrowser/issues/81))
+
+---
+
+## Other Changes
+
+- Added ability to hide quick actions on the homepage.
+
+Thank you to Daniel Rioja for suggesting this.
+
+- Added ability to add a custom URL for the homepage.
+
+Thank you to Daniel Rioja for suggesting this.
+
+- Improved nested scroll.
+- Increased all bottom sheet sizes to max 80%. I can't set this to 100 percent because there's a glitch when you scroll too fast, it will glitch.
+- Updated Privacy Policy.
+
+---
+
+## Bug Fixes
+
+- Fixed Android 10 storage permission.
+- Fixed notification bug. (Thanks to @Woallin [#9](https://github.com/jhaiian/ClintGecko/issues/9))
+
+---
+
+## Donation
+
+Thank you to **Daniel Rioja** for donating $6.67! 💜
+
+---
+
+> There are a lot of requests right now, but I'll get to them eventually. I've just prioritized the donor's request for now because their support helps me personally and supports the project as well. Don't worry, guys! Your issues will be addressed and fixed soon.
+
+---
+
 # v1.2.0-r2
 
 ---
