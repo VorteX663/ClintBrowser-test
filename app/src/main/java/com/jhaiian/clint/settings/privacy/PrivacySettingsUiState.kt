@@ -11,7 +11,6 @@ class PrivacySettingsUiState(
     initialDoNotTrack: Boolean,
     initialStripTrackingParams: Boolean,
     initialGlobalPrivacyControl: Boolean,
-    initialReferrerTrimming: Boolean,
     initialWebRtcProtection: Boolean,
     initialClearOnExit: Boolean,
     initialClearHistory: Boolean,
@@ -34,7 +33,6 @@ class PrivacySettingsUiState(
     var doNotTrack by mutableStateOf(initialDoNotTrack)
     var stripTrackingParams by mutableStateOf(initialStripTrackingParams)
     var globalPrivacyControl by mutableStateOf(initialGlobalPrivacyControl)
-    var referrerTrimming by mutableStateOf(initialReferrerTrimming)
     var webRtcProtection by mutableStateOf(initialWebRtcProtection)
     var clearOnExit by mutableStateOf(initialClearOnExit)
     var clearHistory by mutableStateOf(initialClearHistory)

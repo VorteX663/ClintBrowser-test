@@ -628,7 +628,6 @@ fun PrivacySettingsPane(activity: SettingsActivity) {
             initialDoNotTrack = prefs.getBoolean(PREF_DO_NOT_TRACK, DEFAULT_DO_NOT_TRACK),
             initialStripTrackingParams = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.STRIP_TRACKING_PARAMS, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_STRIP_TRACKING_PARAMS),
             initialGlobalPrivacyControl = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.GLOBAL_PRIVACY_CONTROL, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_GLOBAL_PRIVACY_CONTROL),
-            initialReferrerTrimming = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.REFERRER_TRIMMING, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_REFERRER_TRIMMING),
             initialWebRtcProtection = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_WEBRTC_PROTECTION),
             initialClearOnExit = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLEAR_ON_EXIT),
             initialClearHistory = prefs.getBoolean(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT_HISTORY, com.jhaiian.clint.privacy.PrivacyPrefs.DEFAULT_CLEAR_ON_EXIT_HISTORY),
@@ -665,7 +664,6 @@ fun PrivacySettingsPane(activity: SettingsActivity) {
         onDoNotTrackClick = { toggle(PREF_DO_NOT_TRACK, uiState.doNotTrack) { uiState.doNotTrack = it } },
         onStripTrackingParamsClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.STRIP_TRACKING_PARAMS, uiState.stripTrackingParams) { uiState.stripTrackingParams = it } },
         onGlobalPrivacyControlClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.GLOBAL_PRIVACY_CONTROL, uiState.globalPrivacyControl) { uiState.globalPrivacyControl = it } },
-        onReferrerTrimmingClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.REFERRER_TRIMMING, uiState.referrerTrimming) { uiState.referrerTrimming = it } },
         onWebRtcProtectionClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION, uiState.webRtcProtection) { uiState.webRtcProtection = it } },
         onClearOnExitClick = { toggle(com.jhaiian.clint.privacy.PrivacyPrefs.CLEAR_ON_EXIT, uiState.clearOnExit) { uiState.clearOnExit = it } },
         onClearOnExitConfirmed = { history, cookies, cache ->
@@ -1105,6 +1103,8 @@ fun DownloadSettingsPane(activity: SettingsActivity) {
             initialConcurrentSegments = prefs.getInt(DownloadSettingsKeys.PREF_STREAM_CONCURRENT_SEGMENTS, DownloadSettingsKeys.DEFAULT_STREAM_CONCURRENT_SEGMENTS),
             initialSpeedLimitAmount = prefs.getInt(DownloadSettingsKeys.PREF_SPEED_LIMIT_AMOUNT, DownloadSettingsKeys.DEFAULT_SPEED_LIMIT_AMOUNT),
             initialSpeedLimitUnit = prefs.getString(DownloadSettingsKeys.PREF_SPEED_LIMIT_UNIT, DEFAULT_SPEED_LIMIT_UNIT) ?: DEFAULT_SPEED_LIMIT_UNIT,
+            initialTotalSpeedLimitAmount = prefs.getInt(DownloadSettingsKeys.PREF_TOTAL_SPEED_LIMIT_AMOUNT, DownloadSettingsKeys.DEFAULT_TOTAL_SPEED_LIMIT_AMOUNT),
+            initialTotalSpeedLimitUnit = prefs.getString(DownloadSettingsKeys.PREF_TOTAL_SPEED_LIMIT_UNIT, DEFAULT_SPEED_LIMIT_UNIT) ?: DEFAULT_SPEED_LIMIT_UNIT,
             initialRetryEnabled = prefs.getBoolean(DownloadSettingsKeys.PREF_RETRY_ENABLED, DownloadSettingsKeys.DEFAULT_RETRY_ENABLED),
             initialRetryUnrecoverable = prefs.getBoolean(DownloadSettingsKeys.PREF_RETRY_UNRECOVERABLE, DownloadSettingsKeys.DEFAULT_RETRY_UNRECOVERABLE),
             initialRetryCount = prefs.getInt(DownloadSettingsKeys.PREF_RETRY_COUNT, DownloadSettingsKeys.DEFAULT_RETRY_COUNT),
@@ -1114,6 +1114,7 @@ fun DownloadSettingsPane(activity: SettingsActivity) {
             initialAllFilesAccessGranted = isAllFilesAccessGranted(),
             initialPushNotifications = prefs.getBoolean(DownloadSettingsKeys.PREF_PUSH_NOTIFICATIONS, DownloadSettingsKeys.DEFAULT_PUSH_NOTIFICATIONS),
             initialKeepScreenOn = prefs.getBoolean(DownloadSettingsKeys.PREF_KEEP_SCREEN_ON, DownloadSettingsKeys.DEFAULT_KEEP_SCREEN_ON),
+            initialDownloadLog = prefs.getBoolean(DownloadSettingsKeys.PREF_DOWNLOAD_LOG, DownloadSettingsKeys.DEFAULT_DOWNLOAD_LOG),
             initialQuickDownload = prefs.getBoolean(DownloadSettingsKeys.PREF_QUICK_DOWNLOAD, DownloadSettingsKeys.DEFAULT_QUICK_DOWNLOAD),
             initialQuickDownloadImages = prefs.getBoolean(DownloadSettingsKeys.PREF_QUICK_DOWNLOAD_IMAGES, DownloadSettingsKeys.DEFAULT_QUICK_DOWNLOAD_IMAGES),
             initialHideStatusBar = prefs.getBoolean("hide_status_bar", false),
@@ -1240,6 +1241,12 @@ fun DownloadSettingsPane(activity: SettingsActivity) {
             prefs.edit().putInt(DownloadSettingsKeys.PREF_STREAM_CONCURRENT_SEGMENTS, value).apply()
             uiState.concurrentSegments = value
         },
+        onTotalSpeedLimitConfirm = { amount, unit ->
+            prefs.edit().putInt(DownloadSettingsKeys.PREF_TOTAL_SPEED_LIMIT_AMOUNT, amount).putString(DownloadSettingsKeys.PREF_TOTAL_SPEED_LIMIT_UNIT, unit).apply()
+            uiState.totalSpeedLimitAmount = amount
+            uiState.totalSpeedLimitUnit = unit
+            uiState.openDialog = null
+        },
         onSpeedLimitConfirm = { amount, unit ->
             prefs.edit().putInt(DownloadSettingsKeys.PREF_SPEED_LIMIT_AMOUNT, amount).putString(DownloadSettingsKeys.PREF_SPEED_LIMIT_UNIT, unit).apply()
             uiState.speedLimitAmount = amount
@@ -1282,6 +1289,11 @@ fun DownloadSettingsPane(activity: SettingsActivity) {
             val newValue = !uiState.pushNotifications
             prefs.edit().putBoolean(DownloadSettingsKeys.PREF_PUSH_NOTIFICATIONS, newValue).apply()
             uiState.pushNotifications = newValue
+        },
+        onDownloadLogClick = {
+            val newValue = !uiState.downloadLog
+            prefs.edit().putBoolean(DownloadSettingsKeys.PREF_DOWNLOAD_LOG, newValue).apply()
+            uiState.downloadLog = newValue
         },
         onKeepScreenOnClick = {
             val newValue = !uiState.keepScreenOn

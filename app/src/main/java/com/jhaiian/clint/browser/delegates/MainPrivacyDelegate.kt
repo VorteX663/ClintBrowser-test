@@ -18,7 +18,6 @@ internal fun MainActivity.addPrivacyScripts(tab: BrowserTab) {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
     val scripts = ArrayList<String>()
     if (isGlobalPrivacyControlActive()) scripts.add("global_privacy_control.js")
-    if (prefs.getBoolean(PrivacyPrefs.REFERRER_TRIMMING, PrivacyPrefs.DEFAULT_REFERRER_TRIMMING)) scripts.add("referrer_trimming.js")
     if (prefs.getBoolean(PrivacyPrefs.WEBRTC_PROTECTION, PrivacyPrefs.DEFAULT_WEBRTC_PROTECTION)) scripts.add("webrtc_protection.js")
     if (scripts.isEmpty()) return
     privacyScriptHandlers[tab.id] = scripts.map {

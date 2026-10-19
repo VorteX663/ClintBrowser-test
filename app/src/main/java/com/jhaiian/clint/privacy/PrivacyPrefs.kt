@@ -12,7 +12,6 @@ object PrivacyPrefs {
     const val SCREENSHOT_BLOCKING = "screenshot_blocking"
     const val INCOGNITO_KEYBOARD = "incognito_keyboard"
     const val CLIPBOARD_CLEAR_SECONDS = "clipboard_auto_clear_seconds"
-    const val REFERRER_TRIMMING = "referrer_trimming"
     const val WEBRTC_PROTECTION = "webrtc_protection"
     const val GLOBAL_PRIVACY_CONTROL = "global_privacy_control"
     const val EXIT_CLEAR_PENDING = "exit_clear_pending"
@@ -27,7 +26,6 @@ object PrivacyPrefs {
     const val DEFAULT_SCREENSHOT_BLOCKING = false
     const val DEFAULT_INCOGNITO_KEYBOARD = true
     const val DEFAULT_CLIPBOARD_CLEAR_SECONDS = 0
-    const val DEFAULT_REFERRER_TRIMMING = true
     const val DEFAULT_WEBRTC_PROTECTION = false
     const val DEFAULT_GLOBAL_PRIVACY_CONTROL = true
 

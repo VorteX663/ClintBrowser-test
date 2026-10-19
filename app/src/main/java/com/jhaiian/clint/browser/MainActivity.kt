@@ -144,16 +144,12 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
 
     internal val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
+    ) { _ ->
         val cb = pendingFileChooserCallback
         val params = pendingFileChooserParams
         pendingFileChooserCallback = null
         pendingFileChooserParams = null
-        if (granted && cb != null && params != null) {
-            launchFileChooser(cb, params)
-        } else if (cb != null) {
-            cb.onReceiveValue(null)
-        }
+        if (cb != null && params != null && !launchFileChooser(cb, params)) cb.onReceiveValue(null)
     }
 
     internal val microphonePermissionLauncher = registerForActivityResult(
@@ -254,9 +250,9 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
                 else -> null
             }
         } else {
-            cameraImageUri?.let { contentResolver.delete(it, null, null) }
             null
         }
+        cameraImageUri?.takeIf { uris?.contains(it) != true }?.let { runCatching { contentResolver.delete(it, null, null) } }
         filePathCallback?.onReceiveValue(uris)
         filePathCallback = null
         cameraImageUri = null
@@ -291,7 +287,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
             "javascript_enabled" -> applyJavaScript()
             "block_third_party_cookies" -> applyCookiePolicy()
             "do_not_track", com.jhaiian.clint.privacy.PrivacyPrefs.GLOBAL_PRIVACY_CONTROL,
-            com.jhaiian.clint.privacy.PrivacyPrefs.REFERRER_TRIMMING, com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION -> applyDoNotTrackSettings()
+            com.jhaiian.clint.privacy.PrivacyPrefs.WEBRTC_PROTECTION -> applyDoNotTrackSettings()
             com.jhaiian.clint.browser.webview.ClintAutofill.PREF_AUTOFILL_ENABLED -> applyAutofillSettings()
             "custom_user_agent" -> applyUserAgent()
             "quiver_guard_enabled" -> onQuiverGuardEnabled(prefs.getBoolean("quiver_guard_enabled", false))

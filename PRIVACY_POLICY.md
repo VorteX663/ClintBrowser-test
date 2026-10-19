@@ -42,7 +42,6 @@ Clint Browser has a **Privacy and Security** page in Settings with the options b
 
 - **Strip tracking parameters** (on by default): Removes known tracking parameters, such as `utm_` and `fbclid`, from links before they load. The link is cleaned locally before the page is requested.
 - **Send Global Privacy Control** (on by default): Tells websites that you don't want your data sold or shared. This is only a request, and websites may choose to ignore it.
-- **Trim referrer** (on by default): When you follow a link, only the site address is shared with the destination instead of the full link of the page you came from.
 - **WebRTC leak protection** (off by default): Stops websites from discovering your real IP address through video call features. Some calls may not connect while this is on.
 
 These options reduce some kinds of tracking but cannot stop all of it. Websites can still recognize you through other means, such as browser fingerprinting, accounts you sign in to, or your IP address. Because page loading is handled by your WebView provider, how it behaves internally is outside our control.
