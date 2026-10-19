@@ -72,7 +72,7 @@ The long dropdown menu has been replaced with a bottom sheet. It shows a large p
 
 ### Download Log
 
-A new **Download Log** setting (Download Settings › General), off by default. When turned on, Clint keeps a detailed log for each download plus a global log covering all downloads, to help diagnose problems. Logs include download settings, server responses, parts and segments with their download URLs, retries, errors, progress, and a summary when a download finishes. Cookies are never recorded.
+A new **Download Log** setting (Download Settings â€º General), off by default. When turned on, Clint keeps a detailed log for each download plus a global log covering all downloads, to help diagnose problems. Logs include download settings, server responses, parts and segments with their download URLs, retries, errors, progress, and a summary when a download finishes. Cookies are never recorded.
 
 Open the global log from the Downloads menu, or a single download's log from its details sheet. You can filter to warnings and errors, share the log, or clear it. When the setting is off, nothing is logged, so there is no extra performance or storage cost.
 
@@ -80,7 +80,7 @@ Open the global log from the Downloads menu, or a single download's log from its
 
 ### Total Speed Limit
 
-A new **Total Speed Limit** setting (Download Settings › Speed Limit) caps the combined speed of all downloads, on top of each download's own speed limit.
+A new **Total Speed Limit** setting (Download Settings â€º Speed Limit) caps the combined speed of all downloads, on top of each download's own speed limit.
 
 ---
 
