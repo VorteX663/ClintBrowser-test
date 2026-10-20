@@ -92,6 +92,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         set(value) { uiState.isDesktopMode = value }
     internal var desktopModeHost: String? = null
     internal var autoDesktopPendingReload: String? = null
+    internal val desktopModeOptOutDomains = mutableSetOf<String>()
     internal val desktopScriptHandlers = mutableMapOf<String, ScriptHandler>()
     internal val autoplayScriptHandlers = mutableMapOf<String, ScriptHandler>()
     internal val saveDataScriptHandlers = mutableMapOf<String, ScriptHandler>()
@@ -293,6 +294,8 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
             "quiver_guard_enabled" -> onQuiverGuardEnabled(prefs.getBoolean("quiver_guard_enabled", false))
             com.jhaiian.clint.mediacapture.MEDIA_CAPTURE_ENABLED_PREF -> updateMediaCaptureEnabledState()
             "show_home_button" -> updateHomeButtonState()
+            com.jhaiian.clint.tabs.TabGroupPrefs.PREF_SHOW_GROUP_BAR, com.jhaiian.clint.tabs.TabStripPrefs.PREF_SHOW_TAB_STRIP -> updateTabCount()
+            com.jhaiian.clint.tabs.TabBarPlacement.PREF_TAB_STRIP_POSITION, com.jhaiian.clint.tabs.TabBarPlacement.PREF_TAB_GROUP_BAR_POSITION -> updateTabBarPositions()
             "user_scripts_enabled" -> applyUserScripts()
             "data_saver_enabled", "data_saver_metered_only", "data_saver_disable_images", "data_saver_disable_autoplay", "data_saver_send_header", "data_saver_block_fonts", "data_saver_block_frames", "data_saver_block_preload", "data_saver_block_video", "data_saver_block_scripts", "data_saver_block_css" -> applyDataSaverSettings()
             "hide_bars_on_scroll" -> {
@@ -330,6 +333,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         DataSaverMode.onActiveChanged = { applyDataSaverSettings() }
         updateMediaCaptureEnabledState()
         updateHomeButtonState()
+        updateTabBarPositions()
         tabManager.framelessShortcutIds = com.jhaiian.clint.shortcuts.ShortcutStore.framelessIds(this)
         lastUserScriptsDataVersion = com.jhaiian.clint.userscripts.UserScriptState.getDataVersion(this)
         applySystemUiVisibility()
@@ -443,6 +447,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         ClintDownloadManager.resumeTimeoutPaused(this)
         syncFramelessShortcuts()
         closeInactiveTabs()
+        updateTabCount()
         if (::swipeRefreshView.isInitialized) updateSwipeRefreshColors(uiState.isIncognito)
         bottomBarAnimator2?.cancel()
         uiState.topBarFraction = 0f
@@ -708,26 +713,27 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
     fun onMenuDesktopMode() {
         isDesktopMode = !isDesktopMode
 
-        val wv = tabManager.activeTab?.webView
+        val activeTab = tabManager.activeTab
+        val wv = activeTab?.webView
         val currentWebUrl = wv?.url
         val onHome = isClintHomeUrl(currentWebUrl)
-        val host = if (onHome) null else currentWebUrl?.let { runCatching { android.net.Uri.parse(it).host }.getOrNull() }
+        val host = if (onHome) null else currentWebUrl?.let { runCatching { android.net.Uri.parse(it).host }.getOrNull() }?.takeIf { it.isNotEmpty() }
 
         desktopModeHost = if (isDesktopMode) (if (onHome) CLINT_HOME_HOST else host) else null
+        autoDesktopPendingReload = null
 
-        if (host != null && tabManager.activeTab?.isIncognito != true) {
-            val shouldSave = prefs.getString(
-                com.jhaiian.clint.settings.desktopmode.DesktopModeActivity.PREF_DESKTOP_MODE_SAVE_STATE,
-                com.jhaiian.clint.settings.desktopmode.DesktopModeActivity.VALUE_SAVE_STATE
-            ) == com.jhaiian.clint.settings.desktopmode.DesktopModeActivity.VALUE_SAVE_STATE
-
-            if (isDesktopMode && shouldSave) {
+        if (host != null && isDesktopModeSaveStateEnabled()) {
+            val domain = com.jhaiian.clint.util.registeredDomain(host)
+            if (activeTab?.isIncognito == true) {
+                if (isDesktopMode) desktopModeOptOutDomains.remove(domain) else desktopModeOptOutDomains.add(domain)
+            } else if (isDesktopMode) {
+                desktopModeOptOutDomains.remove(domain)
                 com.jhaiian.clint.settings.sitepermissions.SitePermissionManager.setState(
                     this, host,
                     com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase.TYPE_DESKTOP_MODE,
                     com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase.STATE_ALLOW
                 )
-            } else if (!isDesktopMode && shouldSave) {
+            } else {
                 com.jhaiian.clint.settings.sitepermissions.SitePermissionManager.deleteEntry(
                     this, host,
                     com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase.TYPE_DESKTOP_MODE
@@ -735,11 +741,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
             }
         }
 
-        tabManager.tabs.forEach { tab ->
-            tab.webView.settings.userAgentString = buildUserAgent()
-            applyUserAgentMetadata(tab.webView)
-            if (isDesktopMode) addDesktopScript(tab) else removeDesktopScript(tab)
-        }
+        applyDesktopModeToTabs()
 
         if (wv != null && !currentWebUrl.isNullOrEmpty()) {
             val headers = buildRequestHeaders(currentWebUrl)

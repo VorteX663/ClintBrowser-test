@@ -20,6 +20,8 @@ import com.jhaiian.clint.mediacapture.MEDIA_CAPTURE_CONVERT_TS_TO_MP4_DEFAULT
 import com.jhaiian.clint.mediacapture.MEDIA_CAPTURE_CONVERT_TS_TO_MP4_PREF
 import com.jhaiian.clint.mediacapture.MediaCaptureDialog
 import com.jhaiian.clint.mediacapture.MediaKind
+import com.jhaiian.clint.mediacapture.MediaScanBridge
+import com.jhaiian.clint.browser.webview.loadJsAsset
 import com.jhaiian.clint.mediacapture.download.HlsSubtitleResolver
 import com.jhaiian.clint.mediacapture.download.StreamContainerFormat
 import com.jhaiian.clint.mediacapture.download.StreamDownloadRequest
@@ -43,6 +45,10 @@ internal fun MainActivity.mountMediaCaptureDialog() {
     val theme = prefs.getString("app_theme", "system") ?: "system"
     val hideStatusBar = prefs.getBoolean("hide_status_bar", false)
     val hideSystemNavigation = prefs.getBoolean("hide_system_navigation", false)
+    tabManager.activeTab?.webView?.evaluateJavascript(
+        "if(!window.__clintMediaScan){${loadJsAsset(MediaScanBridge.ASSET)}}${MediaScanBridge.RESCAN_SCRIPT}",
+        null
+    )
 
     overlayContent = {
         ClintComposeTheme(theme = theme) {

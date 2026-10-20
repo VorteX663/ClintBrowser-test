@@ -1,6 +1,6 @@
 # Privacy Policy for Clint Browser
 
-*Last updated: October 18, 2026*
+*Last updated: October 20, 2026*
 
 ## Overview
 
@@ -31,6 +31,10 @@ Clint Browser does not collect, store, transmit, or share any personal data. The
 ## Browsing Data
 
 All browsing data — including history, cookies, cached content, and site storage — is stored locally on your device only. You can clear this data at any time through your device's app settings. Incognito tabs do not save cookies, cached content, or browsing history to your device. You can also have the app delete selected data automatically when you close it, as described in Privacy and Security Settings below.
+
+**Tab groups.** Group names, colors, and which tabs belong to each group are stored locally on your device along with your open tabs. Incognito groups are kept in memory only and are gone when you close the app.
+
+**Undo for closed tabs.** When you close tabs, Clint Browser briefly keeps them in memory so you can tap Undo and bring them back. Nothing is written to storage for this. Incognito tabs are never kept for undo.
 
 ---
 
@@ -68,6 +72,7 @@ You can customize the homepage in Settings.
 
 - **Quick actions.** You can hide the quick actions on the homepage. This preference is stored locally on your device.
 - **Custom homepage URL.** You can set your own web address as the homepage. The address is stored locally on your device. When the homepage opens, Clint Browser loads that address the same way it would load any website, so that site can see your IP address and may set cookies or collect data under its own privacy policy. Only use a homepage you trust.
+- **Favorites.** The tiles and folders in the homepage's Favorites section, their order, and any custom images you pick for them are stored locally on your device. When you pick a custom image, Android's photo picker gives Clint Browser only the image you chose, and a copy is saved inside the app. Favorites are never uploaded or synced, and they are only included in a backup if you create one yourself. How tile icons are fetched is described in the Favicons section below.
 
 ---
 
@@ -124,7 +129,11 @@ Website icons (favicons) are loaded to help identify sites in tabs, history, and
 
 When using the fallback service, only the domain name is sent to retrieve the icon. No personal data or browsing history is included.
 
-You can review DuckDuckGo's privacy policy at https://duckduckgo.com/privacy
+**High-resolution icons.** Favicons in tabs, the tab strip, history, bookmarks, and suggestions, as well as homepage favorites and home screen shortcuts, use larger icons when available. Incognito tabs never look up high-resolution icons. To find one, Clint Browser first checks the website itself for its larger icons and web app manifest. If the site doesn't offer a large enough icon, Clint Browser asks Google's favicon service (`t3.gstatic.com`) and then DuckDuckGo's favicon service. Only the site's address without any page path (for example, `https://example.com`) is sent to Google, and only the domain name is sent to DuckDuckGo. Found icons are cached on your device.
+
+If you turn off favicons in Data Saver, none of these requests are made.
+
+You can review DuckDuckGo's privacy policy at https://duckduckgo.com/privacy and Google's privacy policy at https://policies.google.com/privacy
 
 ---
 
@@ -136,7 +145,7 @@ Bookmarks are stored locally on your device only using SQLite. They are never sy
 
 ## Backup & Restore
 
-Clint Browser lets you back up your data, things like bookmarks, history, and settings, into a single file you keep for yourself. Here's how it actually works, in plain terms:
+Clint Browser lets you back up your data, things like bookmarks, history, settings, open tabs and tab groups, and homepage favorites and their custom images, into a single file you keep for yourself. Here's how it actually works, in plain terms:
 
 - **You choose where it goes.** When you create a backup, Android's own file picker opens and you pick the folder: your device storage, an SD card, wherever. Clint Browser doesn't send the file anywhere on its own, and there's no cloud sync tied to it.
 - **Password protection is optional, and it's real encryption.** If you set a password, the backup is locked with AES‑256‑GCM, the same kind of encryption used by banks and messaging apps. Your password itself is never used directly. It's run through Argon2id first, which is specifically designed to make password-guessing slow and expensive, even for someone with serious hardware. If you leave the password blank, the backup is saved without encryption, which is convenient but means anyone with the file can read it, so treat it like any other unprotected file.
@@ -151,13 +160,13 @@ In short: your backups never leave your control unless you move them somewhere y
 
 ## Downloads
 
-Files you download are saved directly to your device. Clint Browser does not upload, scan, or transmit downloaded files. Download details, such as progress and the segment information shown in a download's Properties dialog, are stored locally on your device and are never transmitted.
+Files you download are saved directly to your device. Clint Browser does not upload or transmit downloaded files. To give a file the right name and extension, Clint Browser may read the server's response headers and the first few bytes of the file. This check happens on your device and nothing is sent anywhere. Download details, such as progress and the segment information shown in a download's Properties dialog, are stored locally on your device and are never transmitted.
 
 ---
 
 ## Media Capture
 
-Media Capture detects media resources used by websites, such as video, audio, subtitles, and streaming formats like HLS/M3U8 and DASH, and lets you download them directly. For example, when a page plays a video, Media Capture inspects the page and its network requests to find available media streams and lists them as downloadable options. Some sites serve video and audio as separate streams, and where supported, Media Capture can combine them into a single file.
+Media Capture detects media resources used by websites, such as video, audio, subtitles, and streaming formats like HLS/M3U8 and DASH, and lets you download them directly. For example, when a page plays a video, Media Capture inspects the page and its network requests to find available media streams and lists them as downloadable options. When Media Capture is turned on, it also reads the page's content, such as media players, links, and player settings, to find every available quality and subtitle, not just the one that is playing. Clint Browser may contact the website to check a found link's size and format, the same way the page itself would. Some sites serve video and audio as separate streams, and where supported, Media Capture can combine them into a single file.
 
 **Combining video and audio.** Some sites deliver a video with no sound as one stream and the audio as a separate track. When you choose to combine them, Clint Browser downloads both streams and merges them into a single playable video file on your device. The merge is done locally using your device's media components, either through the hardware codec or the software codec depending on your codec setting, and nothing is sent to an external server.
 
@@ -203,6 +212,7 @@ User scripts are pieces of JavaScript you can install to change how pages look o
 Shortcuts let you add a website to your home screen. Here's how they handle your data:
 
 - **Shortcut data is local.** A shortcut's name, URL, icon, frameless setting, and the profile it opens in are stored on your device. They are never uploaded or synced anywhere by Clint Browser.
+- **Shortcut icons may be fetched in high resolution.** When you add a shortcut, Clint Browser looks for a sharper icon as described in the Favicons section above.
 - **The home screen icon belongs to your launcher.** Clint Browser asks Android to place the icon, and your launcher handles it from there.
 - **Opening a shortcut loads the website.** It connects to the site the same way visiting the page normally would.
 - **Deleting a shortcut removes its data from the app.** Its icon may stay on your home screen until you remove it yourself.
@@ -296,7 +306,7 @@ Clint Browser does not knowingly collect any personal information from anyone, i
 
 Clint Browser does not include analytics, advertising, or tracking SDKs.
 
-However, the search engine or services you choose (such as DuckDuckGo, Brave Search, Ecosia, Google, or a custom one you configure) may collect data according to their own privacy policies. Clint Browser has no control over those services. Additionally, the search suggestions feature uses DuckDuckGo's or Google's public suggestion API, or a custom one you configure, depending on which provider you've selected, and the favicon fallback feature uses DuckDuckGo's public API, as described above. Any user scripts you install can also communicate with third party services on their own, as described in the User Scripts section above. If you set a custom homepage, that website is also a third party and is subject to its own privacy policy.
+However, the search engine or services you choose (such as DuckDuckGo, Brave Search, Ecosia, Google, or a custom one you configure) may collect data according to their own privacy policies. Clint Browser has no control over those services. Additionally, the search suggestions feature uses DuckDuckGo's or Google's public suggestion API, or a custom one you configure, depending on which provider you've selected, and the favicon fallback feature uses DuckDuckGo's public API, while high-resolution icons may also use Google's favicon service, as described above. Any user scripts you install can also communicate with third party services on their own, as described in the User Scripts section above. If you set a custom homepage, that website is also a third party and is subject to its own privacy policy.
 
 ---
 

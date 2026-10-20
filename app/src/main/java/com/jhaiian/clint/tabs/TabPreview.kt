@@ -5,5 +5,6 @@ data class TabPreview(
     val title: String,
     val url: String,
     val isIncognito: Boolean,
-    val profileId: String = "default"
+    val profileId: String = "default",
+    val groupId: String? = null
 )

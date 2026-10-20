@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.WebAsset
 import androidx.compose.foundation.layout.padding
 import com.jhaiian.clint.ui.ClintSwitch
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -43,6 +45,9 @@ fun LookAndFeelScreen(
     onHideStatusBarRowClicked: () -> Unit,
     onHideSystemNavigationRowClicked: () -> Unit,
     onShowHomeButtonRowClicked: () -> Unit,
+    onShowTabStripRowClicked: () -> Unit,
+    onTabStripPositionSelected: (String) -> Unit,
+    onTabGroupBarPositionSelected: (String) -> Unit,
     onCustomizeMenuRowClicked: () -> Unit,
     onExitConfirmationConfirmed: (String) -> Unit,
     onPopupAlertStyleSelected: (String) -> Unit
@@ -80,6 +85,16 @@ fun LookAndFeelScreen(
                 LookAndFeelDialog.EXIT_CONFIRMATION -> ExitConfirmationDialog(
                     current = state.exitConfirmation, hideStatusBar = state.hideStatusBar, hideSystemNavigation = state.hideSystemNavigation,
                     onConfirm = onExitConfirmationConfirmed, onDismiss = { state.openDialog = null }
+                )
+                LookAndFeelDialog.TAB_STRIP_POSITION -> TabBarPositionDialog(
+                    title = stringResource(R.string.pref_tab_strip_position_title),
+                    current = state.tabStripPosition, hideStatusBar = state.hideStatusBar, hideSystemNavigation = state.hideSystemNavigation,
+                    onSelect = onTabStripPositionSelected, onDismiss = { state.openDialog = null }
+                )
+                LookAndFeelDialog.TAB_GROUP_BAR_POSITION -> TabBarPositionDialog(
+                    title = stringResource(R.string.pref_tab_group_bar_position_title),
+                    current = state.tabGroupBarPosition, hideStatusBar = state.hideStatusBar, hideSystemNavigation = state.hideSystemNavigation,
+                    onSelect = onTabGroupBarPositionSelected, onDismiss = { state.openDialog = null }
                 )
                 LookAndFeelDialog.POPUP_ALERT_STYLE -> PopupAlertStyleDialog(
                     current = state.popupAlertStyle, hideStatusBar = state.hideStatusBar, hideSystemNavigation = state.hideSystemNavigation,
@@ -171,6 +186,33 @@ fun LookAndFeelScreen(
                 trailing = {
                     ClintSwitch(checked = state.showHomeButton)
                 }
+            )
+            RowDivider(colors.divider)
+            SettingsRow(
+                icon = androidx.compose.material.icons.Icons.Filled.Tab,
+                title = stringResource(R.string.pref_tab_strip_title),
+                summary = stringResource(R.string.pref_tab_strip_summary),
+                colors = colors,
+                onClick = onShowTabStripRowClicked,
+                trailing = {
+                    ClintSwitch(checked = state.showTabStrip)
+                }
+            )
+            RowDivider(colors.divider)
+            SettingsRow(
+                icon = androidx.compose.material.icons.Icons.Filled.VerticalAlignTop,
+                title = stringResource(R.string.pref_tab_strip_position_title),
+                summary = stringResource(tabBarPositionSummaryRes(state.tabStripPosition)),
+                colors = colors,
+                onClick = { state.openDialog = LookAndFeelDialog.TAB_STRIP_POSITION }
+            )
+            RowDivider(colors.divider)
+            SettingsRow(
+                icon = androidx.compose.material.icons.Icons.Filled.Layers,
+                title = stringResource(R.string.pref_tab_group_bar_position_title),
+                summary = stringResource(tabBarPositionSummaryRes(state.tabGroupBarPosition)),
+                colors = colors,
+                onClick = { state.openDialog = LookAndFeelDialog.TAB_GROUP_BAR_POSITION }
             )
             RowDivider(colors.divider)
             SettingsRow(
@@ -299,6 +341,12 @@ private fun nestedScrollSummaryRes(mode: String): Int = when (mode) {
     "navigation_bar" -> R.string.nested_scroll_nav_bar
     "both" -> R.string.nested_scroll_both
     else -> R.string.nested_scroll_search_bar
+}
+
+private fun tabBarPositionSummaryRes(position: String): Int = when (position) {
+    com.jhaiian.clint.tabs.TabBarPlacement.TOP -> R.string.address_bar_position_top
+    com.jhaiian.clint.tabs.TabBarPlacement.BOTTOM -> R.string.address_bar_position_bottom
+    else -> R.string.tab_bar_position_follow
 }
 
 private fun addressBarPositionSummaryRes(position: String): Int = when (position) {

@@ -9,7 +9,6 @@ import com.jhaiian.clint.browser.MainActivity
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.webkit.CookieManager
-import android.webkit.URLUtil
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.webkit.ServiceWorkerClientCompat
@@ -19,9 +18,11 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.jhaiian.clint.downloads.ClintDownloadManager
+import com.jhaiian.clint.downloads.DownloadFilenameResolver
 import com.jhaiian.clint.mediacapture.MEDIA_CAPTURE_ENABLED_PREF
 import com.jhaiian.clint.mediacapture.MediaCaptureDetector
 import com.jhaiian.clint.mediacapture.MediaCaptureStore
+import com.jhaiian.clint.mediacapture.MediaScanBridge
 import com.jhaiian.clint.quiver.engine.QuiverGuardWebIntegration
 import com.jhaiian.clint.tabs.BrowserTab
 import com.jhaiian.clint.profiles.WebProfiles
@@ -73,6 +74,7 @@ internal fun MainActivity.createWebView(isIncognito: Boolean, profileId: String 
     webView.addJavascriptInterface(DateTimePickerBridge(this, webView), "DateTimePickerBridge")
     webView.addJavascriptInterface(ColorPickerBridge(this, webView), "ColorPickerBridge")
     webView.addJavascriptInterface(DataSaverBridge(applicationContext), "ClintDataSaverBridge")
+    webView.addJavascriptInterface(MediaScanBridge(prefs) { runCatching { tabManager.tabs.find { it.webView === webView }?.id }.getOrNull() }, MediaScanBridge.NAME)
 
     if (prefs.getBoolean("quiver_guard_enabled", false)) {
         QuiverGuardWebIntegration.installEarly(this, webView)
@@ -80,7 +82,7 @@ internal fun MainActivity.createWebView(isIncognito: Boolean, profileId: String 
     webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
         if (tabManager.activeTab?.webView !== webView) return@setDownloadListener
         if (url.startsWith("blob:")) {
-            val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
+            val filename = DownloadFilenameResolver.resolve(url, contentDisposition, mimetype)
             val safeUrl = url.replace("\\", "\\\\").replace("'", "\\'")
             val safeFilename = filename.replace("\\", "\\\\").replace("'", "\\'")
             val safeMime = mimetype.replace("\\", "\\\\").replace("'", "\\'")
@@ -101,14 +103,7 @@ internal fun MainActivity.createWebView(isIncognito: Boolean, profileId: String 
             """.trimIndent(), null)
             return@setDownloadListener
         }
-        var filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
-        if (filename.endsWith(".bin")) {
-            val urlPath = url.substringBefore("?").substringBefore("#")
-            val urlExt = urlPath.substringAfterLast(".", "")
-            if (urlExt.isNotEmpty() && urlExt.length in 1..10 && urlExt != "bin" && !urlExt.contains("/")) {
-                filename = filename.removeSuffix(".bin") + ".$urlExt"
-            }
-        }
+        val filename = DownloadFilenameResolver.resolve(url, contentDisposition, mimetype)
         val referer = webView.url ?: ""
         val cookies = WebProfiles.cookieFor(WebProfiles.profileOf(webView), url)
         val session = refreshLinkSession
@@ -128,6 +123,7 @@ internal fun MainActivity.createWebView(isIncognito: Boolean, profileId: String 
         WebViewCompat.addDocumentStartJavaScript(webView, loadJsAsset("date_time_picker.js"), setOf("*"))
         WebViewCompat.addDocumentStartJavaScript(webView, loadJsAsset("color_picker.js"), setOf("*"))
         WebViewCompat.addDocumentStartJavaScript(webView, loadJsAsset("fullscreen_popup_guard.js"), setOf("*"))
+        WebViewCompat.addDocumentStartJavaScript(webView, loadJsAsset(MediaScanBridge.ASSET), setOf("*"))
     }
     return webView
 }
@@ -389,6 +385,45 @@ internal fun MainActivity.addDesktopScript(tab: BrowserTab) {
 
 internal fun MainActivity.removeDesktopScript(tab: BrowserTab) {
     desktopScriptHandlers.remove(tab.id)?.remove()
+}
+
+internal fun MainActivity.isDesktopModeSaveStateEnabled(): Boolean =
+    prefs.getString(
+        com.jhaiian.clint.settings.desktopmode.DesktopModeActivity.PREF_DESKTOP_MODE_SAVE_STATE,
+        com.jhaiian.clint.settings.desktopmode.DesktopModeActivity.VALUE_SAVE_STATE
+    ) == com.jhaiian.clint.settings.desktopmode.DesktopModeActivity.VALUE_SAVE_STATE
+
+internal fun MainActivity.applyDesktopModeToTabs() {
+    val ua = buildUserAgent()
+    tabManager.tabs.forEach { tab ->
+        tab.webView.settings.userAgentString = ua
+        applyUserAgentMetadata(tab.webView)
+        if (isDesktopMode) addDesktopScript(tab) else removeDesktopScript(tab)
+    }
+}
+
+internal fun MainActivity.syncDesktopModeForUrl(url: String): Boolean {
+    if (!url.startsWith("http") || com.jhaiian.clint.browser.home.isClintHomeUrl(url)) return false
+    val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return false
+    val shouldSaveState = isDesktopModeSaveStateEnabled()
+    val domain = com.jhaiian.clint.util.registeredDomain(host)
+    val optedOut = tabManager.activeTab?.isIncognito == true && domain in desktopModeOptOutDomains
+    val isSaved = shouldSaveState && !optedOut &&
+        com.jhaiian.clint.settings.sitepermissions.SitePermissionManager.getState(
+            this, host, com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase.TYPE_DESKTOP_MODE
+        ) != null
+    val lockedHost = desktopModeHost
+    val enable = when {
+        isSaved -> true
+        !isDesktopMode -> false
+        !shouldSaveState || lockedHost == null || lockedHost == com.jhaiian.clint.browser.home.CLINT_HOME_HOST -> true
+        else -> com.jhaiian.clint.util.registeredDomain(lockedHost) == domain
+    }
+    desktopModeHost = if (enable) host else null
+    if (enable == isDesktopMode) return false
+    isDesktopMode = enable
+    applyDesktopModeToTabs()
+    return true
 }
 
 internal fun MainActivity.addUserScripts(tab: BrowserTab) {
