@@ -251,13 +251,7 @@ A new **Total Speed Limit** setting (Download Settings › Speed Limit) caps the
 
 - Fixed system navigation covering the pages.
 
-(Thanks to @deniganda for reporting this [#87](https://github.com/jhaiian/ClintBrowser/issues/87))
-
----
-
-## Donation
-
-Thank you to **Daniel Rioja** for donating another $13.48! Thank you so much, sir. This covers two weeks of my expenses going to college. This definitely helps a lot.
+(Thanks to @deniganda for reporting this [#87](https://github.com/jhaiian/ClintBrowser/issues/87)
 
 ---
 
@@ -343,14 +337,7 @@ Thank you to Daniel Rioja for suggesting this.
 ## Bug Fixes
 
 - Fixed Android 10 storage permission.
-- Fixed notification bug. (Thanks to @Woallin [#9](https://github.com/jhaiian/ClintGecko/issues/9))
-
----
-
-## Donation
-
-Thank you to **Daniel Rioja** for donating $6.67! 💜
-
+- Fixed notification bug. (Thanks to @Woallin [#9](https://github.com/jhaiian/ClintGecko/issues/9))
 ---
 
 > There are a lot of requests right now, but I'll get to them eventually. I've just prioritized the donor's request for now because their support helps me personally and supports the project as well. Don't worry, guys! Your issues will be addressed and fixed soon.
