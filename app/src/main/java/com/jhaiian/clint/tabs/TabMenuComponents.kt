@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Public
@@ -101,6 +103,7 @@ internal fun TabMenuCard(
     onToggleSelect: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onToggleMute: () -> Unit = {},
     mergeHighlighted: Boolean = false,
     showDragHandle: Boolean = true,
     longPressDragModifier: Modifier? = null
@@ -174,6 +177,17 @@ internal fun TabMenuCard(
                 )
                 AnimatedVisibility(visible = !selectionMode, enter = fadeIn(tween(150)), exit = fadeOut(tween(120))) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val audio = preview.audio
+                        if (audio != null && (audio.audible || audio.muted)) {
+                            IconButton(onClick = onToggleMute, modifier = Modifier.size(26.dp)) {
+                                Icon(
+                                    if (audio.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                    contentDescription = stringResource(if (audio.muted) R.string.tab_unmute_desc else R.string.tab_mute_desc),
+                                    tint = if (audio.muted) onCardSecondary else accentColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                         if (showDragHandle) {
                             Icon(
                                 Icons.Filled.DragIndicator,
@@ -274,6 +288,7 @@ internal fun TabMenuListRow(
     onToggleSelect: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onToggleMute: () -> Unit = {},
     mergeHighlighted: Boolean = false,
     showDragHandle: Boolean = true,
     longPressDragModifier: Modifier? = null
@@ -365,6 +380,17 @@ internal fun TabMenuListRow(
         }
         AnimatedVisibility(visible = !selectionMode, enter = fadeIn(tween(150)), exit = fadeOut(tween(120))) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val audio = preview.audio
+                if (audio != null && (audio.audible || audio.muted)) {
+                    IconButton(onClick = onToggleMute, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            if (audio.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = stringResource(if (audio.muted) R.string.tab_unmute_desc else R.string.tab_mute_desc),
+                            tint = if (audio.muted) onRowSecondary else accentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
                 if (showDragHandle) {
                     Icon(
                         Icons.Filled.DragIndicator,

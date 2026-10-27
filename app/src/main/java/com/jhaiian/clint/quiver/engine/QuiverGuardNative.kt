@@ -10,7 +10,7 @@ internal object QuiverGuardNative {
     external fun nativeNewFilterSetBuilder(): Long
 
     @JvmStatic
-    external fun nativeAddFilterListRules(builderHandle: Long, rules: String): String
+    external fun nativeAddFilterListRules(builderHandle: Long, rules: String, trusted: Boolean): String
 
     @JvmStatic
     external fun nativeDestroyFilterSetBuilder(builderHandle: Long)
@@ -35,6 +35,9 @@ internal object QuiverGuardNative {
 
     @JvmStatic
     external fun nativeUrlCosmeticResources(handle: Long, url: String): String
+
+    @JvmStatic
+    external fun nativeScriptletScript(handle: Long, url: String): String
 
     @JvmStatic
     external fun nativeHiddenClassIdSelectors(

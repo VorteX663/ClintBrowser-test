@@ -101,8 +101,10 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
     internal val dataSaverVideoScriptHandlers = mutableMapOf<String, ScriptHandler>()
     internal val dataSaverScriptBlockHandlers = mutableMapOf<String, ScriptHandler>()
     internal val userScriptHandlers = mutableMapOf<String, ScriptHandler>()
+    internal val backgroundPlaybackScriptHandlers = mutableMapOf<String, ScriptHandler>()
+    internal val backgroundPlaybackTracker = com.jhaiian.clint.browser.media.BackgroundPlaybackTracker()
+    internal var backgroundPlaybackCommandHandler: ((com.jhaiian.clint.browser.media.BackgroundPlayback.Command) -> Unit)? = null
     private var lastUserScriptsDataVersion = 0L
-    internal val quiverGuardScriptHandlers = com.jhaiian.clint.quiver.engine.ScriptHandlerStore()
     internal val quiverGuardJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     internal var bottomBarAnimator2: android.animation.ValueAnimator? = null
@@ -295,8 +297,11 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
             com.jhaiian.clint.mediacapture.MEDIA_CAPTURE_ENABLED_PREF -> updateMediaCaptureEnabledState()
             "show_home_button" -> updateHomeButtonState()
             com.jhaiian.clint.tabs.TabGroupPrefs.PREF_SHOW_GROUP_BAR, com.jhaiian.clint.tabs.TabStripPrefs.PREF_SHOW_TAB_STRIP -> updateTabCount()
+            com.jhaiian.clint.tabs.TabGroupPrefs.PREF_TAB_GROUPS_ENABLED -> applyTabGroupsSetting()
             com.jhaiian.clint.tabs.TabBarPlacement.PREF_TAB_STRIP_POSITION, com.jhaiian.clint.tabs.TabBarPlacement.PREF_TAB_GROUP_BAR_POSITION -> updateTabBarPositions()
             "user_scripts_enabled" -> applyUserScripts()
+            com.jhaiian.clint.translation.PREF_TRANSLATION_SHOW_BUTTON -> onTranslationPrefChanged(key)
+            com.jhaiian.clint.browser.media.BackgroundPlayback.PREF_ENABLED -> applyBackgroundPlaybackSetting()
             "data_saver_enabled", "data_saver_metered_only", "data_saver_disable_images", "data_saver_disable_autoplay", "data_saver_send_header", "data_saver_block_fonts", "data_saver_block_frames", "data_saver_block_preload", "data_saver_block_video", "data_saver_block_scripts", "data_saver_block_css" -> applyDataSaverSettings()
             "hide_bars_on_scroll" -> {
                 if (!prefs.getBoolean("hide_bars_on_scroll", true)) {
@@ -331,9 +336,11 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         DataSaverMode.onActiveChanged = { applyDataSaverSettings() }
+        attachBackgroundPlayback()
         updateMediaCaptureEnabledState()
         updateHomeButtonState()
         updateTabBarPositions()
+        setupTranslations()
         tabManager.framelessShortcutIds = com.jhaiian.clint.shortcuts.ShortcutStore.framelessIds(this)
         lastUserScriptsDataVersion = com.jhaiian.clint.userscripts.UserScriptState.getDataVersion(this)
         applySystemUiVisibility()
@@ -372,6 +379,7 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         setupSwipeRefresh()
         setupAddressBar()
         applyAddressBarPosition()
+        if (savedInstanceState == null && com.jhaiian.clint.privacy.PrivacyPrefs.closesTabsOnExit(prefs)) discardSavedTabs()
         val isRefreshLinkMode = intent.getBooleanExtra(EXTRA_REFRESH_LINK_MODE, false)
         val shortcutId = intent.getStringExtra(EXTRA_SHORTCUT_ID)
         applyShortcutFrameless(shortcutId)
@@ -445,8 +453,13 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         super.onResume()
         if (isFinishing) return
         ClintDownloadManager.resumeTimeoutPaused(this)
+        refreshBackgroundPlaybackVisibility()
         syncFramelessShortcuts()
         closeInactiveTabs()
+        if (com.jhaiian.clint.privacy.BrowsingDataCleaner.consumeCloseAllTabsRequest()) {
+            val ids = tabManager.previews().map { it.id }
+            if (ids.isNotEmpty()) closeTabsWithUndo(ids, resources.getQuantityString(R.plurals.tab_menu_closed_tabs, ids.size, ids.size))
+        }
         updateTabCount()
         if (::swipeRefreshView.isInitialized) updateSwipeRefreshColors(uiState.isIncognito)
         bottomBarAnimator2?.cancel()
@@ -477,7 +490,12 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
 
     override fun onStop() {
         super.onStop()
-        saveTabs()
+        refreshBackgroundPlaybackVisibility()
+        if (isFinishing && com.jhaiian.clint.privacy.PrivacyPrefs.closesTabsOnExit(prefs)) {
+            Thread { discardSavedTabs() }.start()
+        } else {
+            saveTabs()
+        }
         if (refreshLinkSession != null) {
             cleanupRefreshLinkTabs()
             refreshLinkSession = null
@@ -492,6 +510,8 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         DataSaverMode.onActiveChanged = null
+        teardownTranslations()
+        detachBackgroundPlayback()
         if (refreshLinkSession != null) {
             cleanupRefreshLinkTabs()
             refreshLinkSession = null
@@ -541,6 +561,10 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
             override fun handleOnBackPressed() {
                 if (uiState.websiteBlockedRequest != null) {
                     dismissWebsiteBlockedOverlay()
+                    return
+                }
+                if (uiState.quiverGuardBlockedRequest != null) {
+                    dismissQuiverGuardBlockedOverlay()
                     return
                 }
                 if (fullscreenView != null) {
@@ -834,8 +858,18 @@ class MainActivity : ClintActivity(), OverlayHostActivity, SnackbarHostActivity,
         applyDataSaverSiteState(tab, currentUrl)
         reloadActiveTabWithHeaders()
     }
+    fun onMenuToggleTabMute() {
+        val tab = tabManager.activeTab ?: return
+        toggleTabMute(tab.id)
+    }
     fun onMenuCookiesControl() {
         openCookiesControl()
+    }
+    fun onMenuTranslate() {
+        openTranslatePage()
+    }
+    fun onMenuOpenTranslationSettings() {
+        openTranslationSettings()
     }
     fun onMenuWebsiteBlocker() {
         val enabled = !prefs.getBoolean("website_blocker_enabled", false)
@@ -1094,9 +1128,7 @@ td,th{border:1px solid $secondaryColor;padding:6px 8px;}
     inner class BlobDownloadBridge {
         @android.webkit.JavascriptInterface
         fun receiveBlob(base64: String, filename: String, mimeType: String) {
-            runOnUiThread {
-                showDownloadDialogForBlob(base64, filename, mimeType)
-            }
+            downloadBase64Blob(base64, filename, mimeType)
         }
 
         @android.webkit.JavascriptInterface
@@ -1164,7 +1196,7 @@ td,th{border:1px solid $secondaryColor;padding:6px 8px;}
 
         @android.webkit.JavascriptInterface
         fun download(base64: String, filename: String, mimeType: String) {
-            runOnUiThread { showDownloadDialogForBlob(base64, filename, mimeType) }
+            downloadBase64Blob(base64, filename, mimeType)
         }
 
         @android.webkit.JavascriptInterface

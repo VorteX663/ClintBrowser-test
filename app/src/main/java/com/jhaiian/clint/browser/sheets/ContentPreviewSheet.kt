@@ -62,8 +62,6 @@ import com.jhaiian.clint.browser.webview.ClintWebViewClient
 import com.jhaiian.clint.browser.webview.loadJsAsset
 import com.jhaiian.clint.quiver.engine.BlockedRequestCounter
 import com.jhaiian.clint.quiver.engine.QuiverGuardWebIntegration
-import com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase
-import com.jhaiian.clint.settings.sitepermissions.SitePermissionManager
 import com.jhaiian.clint.ui.ClintDialogStatusBarEffect
 import com.jhaiian.clint.ui.FaviconCache
 import com.jhaiian.clint.ui.theme.LocalClintColors
@@ -220,12 +218,10 @@ private fun PreviewWebView(
                     val dataSaverEnabled = DataSaverMode.isActive(prefs)
                     val disableImages = dataSaverEnabled && prefs.getBoolean("data_saver_disable_images", false)
                     val disableAutoplay = dataSaverEnabled && prefs.getBoolean("data_saver_disable_autoplay", true)
-                    val quiverGuardEnabled = prefs.getBoolean("quiver_guard_enabled", false)
-
                     val wv = WebView(ctx)
                     onWebViewCreated(wv)
 
-                    if (quiverGuardEnabled) QuiverGuardWebIntegration.installEarly(ctx, wv)
+                    QuiverGuardWebIntegration.attach(ctx, wv) { quiverGuardPreviewTabId }
 
                     wv.settings.apply {
                         javaScriptEnabled = request.isPage
@@ -265,17 +261,19 @@ private fun PreviewWebView(
                                 if (pageHost.isNotEmpty()) onUrlChanged(pageHost)
                             }
 
-                            if (request.isPage && quiverGuardEnabled && !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                            if (request.isPage && !QuiverGuardWebIntegration.supportsDocumentStart) {
                                 scope.launch {
-                                    val pageHost = runCatching { android.net.Uri.parse(pageUrl).host }.getOrNull()
-                                    val isExcepted = withContext(Dispatchers.IO) {
-                                        pageHost != null && SitePermissionManager.getState(ctx, pageHost, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION) != null
+                                    val scripts = withContext(Dispatchers.IO) {
+                                        if (!QuiverGuardWebIntegration.isActiveFor(ctx, pageUrl)) {
+                                            emptyList()
+                                        } else {
+                                            listOfNotNull(
+                                                QuiverGuardWebIntegration.fallbackBootstrapScript(ctx),
+                                                QuiverGuardWebIntegration.fallbackScriptletScript(pageUrl)
+                                            )
+                                        }
                                     }
-                                    if (isExcepted) return@launch
-                                    val script = withContext(Dispatchers.IO) {
-                                        QuiverGuardWebIntegration.buildCosmeticFilterScript(ctx, pageUrl, true)
-                                    } ?: return@launch
-                                    QuiverGuardWebIntegration.applyCosmeticFilterScript(wv, script)
+                                    scripts.forEach { wv.evaluateJavascript(it, null) }
                                 }
                             }
                         },

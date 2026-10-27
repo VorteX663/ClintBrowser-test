@@ -70,6 +70,7 @@ class QuiverGuardActivity : ClintActivity() {
         }
 
         uiState.masterEnabled = prefs.getBoolean("quiver_guard_enabled", false)
+        uiState.autoUpdateEnabled = QuiverGuardAutoUpdater.isEnabled(this)
         refreshFilterListDisplay()
         loadManualFilterSummary()
         performStartupValidation()
@@ -92,6 +93,10 @@ class QuiverGuardActivity : ClintActivity() {
                         onMasterToggle = { enabled ->
                             uiState.masterEnabled = enabled
                             prefs.edit().putBoolean("quiver_guard_enabled", enabled).apply()
+                        },
+                        onAutoUpdateToggle = { enabled ->
+                            uiState.autoUpdateEnabled = enabled
+                            QuiverGuardAutoUpdater.setEnabled(this@QuiverGuardActivity, enabled)
                         },
                         onManualFilterClick = {
                             startActivity(android.content.Intent(this@QuiverGuardActivity, ManualFilterActivity::class.java))

@@ -11,10 +11,11 @@
 mod bundled_resources;
 
 use adblock::engine::{DeserializationError, Engine};
-use adblock::lists::{FilterSet, ParseOptions};
+use adblock::lists::{FilterFormat, FilterSet, ParseOptions};
 use adblock::request::Request;
+use adblock::resources::PermissionMask;
 use jni::objects::{JClass, JString};
-use jni::sys::{jlong, jstring};
+use jni::sys::{jboolean, jlong, jstring, JNI_FALSE};
 use jni::JNIEnv;
 use serde::Serialize;
 use std::panic::{self, AssertUnwindSafe};
@@ -40,6 +41,21 @@ fn make_jstring(env: &mut JNIEnv, s: &str) -> jstring {
 #[derive(Serialize)]
 struct ErrorJson<'a> {
     error: &'a str,
+}
+
+fn is_hash_comment(line: &str) -> bool {
+    let mut chars = line.chars();
+    chars.next() == Some('#') && !matches!(chars.next(), Some('#' | '@' | '?' | '$' | '%'))
+}
+
+fn is_hosts_entry(line: &str) -> bool {
+    let mut parts = line.split_whitespace();
+    match (parts.next(), parts.next()) {
+        (Some(address), Some(host)) => {
+            matches!(address, "0.0.0.0" | "127.0.0.1" | "::" | "::1") && !host.starts_with('#')
+        }
+        _ => false,
+    }
 }
 
 fn error_json(message: &str) -> String {
@@ -81,6 +97,7 @@ pub extern "system" fn Java_com_jhaiian_clint_quiver_engine_QuiverGuardNative_na
     _class: JClass,
     builder_handle: jlong,
     rules: JString,
+    trusted: jboolean,
 ) -> jstring {
     let json = guard(error_json("panic while adding filter list"), || {
         if builder_handle == 0 {
@@ -91,19 +108,41 @@ pub extern "system" fn Java_com_jhaiian_clint_quiver_engine_QuiverGuardNative_na
         let mut rule_lines = 0u32;
         let mut comment_lines = 0u32;
         let mut empty_lines = 0u32;
+        let mut hosts_lines = 0u32;
         for line in rules_str.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 empty_lines += 1;
-            } else if trimmed.starts_with('!') || trimmed.starts_with('[') {
+            } else if trimmed.starts_with('!') || trimmed.starts_with('[') || is_hash_comment(trimmed) {
                 comment_lines += 1;
             } else {
                 rule_lines += 1;
+                if is_hosts_entry(trimmed) {
+                    hosts_lines += 1;
+                }
             }
         }
 
+        let format = if hosts_lines > 0 && hosts_lines * 2 >= rule_lines {
+            FilterFormat::Hosts
+        } else {
+            FilterFormat::Standard
+        };
+        let permissions = if trusted != JNI_FALSE {
+            bundled_resources::TRUSTED_SCRIPTLET
+        } else {
+            PermissionMask::default()
+        };
+
         let filter_set: &mut FilterSet = unsafe { &mut *(builder_handle as *mut FilterSet) };
-        let _ = filter_set.add_filter_list(rules_str, ParseOptions::default());
+        let _ = filter_set.add_filter_list(
+            rules_str,
+            ParseOptions {
+                format,
+                permissions,
+                ..ParseOptions::default()
+            },
+        );
 
         serde_json::to_string(&AddListStats {
             rule_lines,
@@ -289,9 +328,14 @@ pub extern "system" fn Java_com_jhaiian_clint_quiver_engine_QuiverGuardNative_na
         let engine: &Engine = unsafe { &*(handle as *const Engine) };
         let result = engine.check_network_request(&request);
         let csp = engine.get_csp_directives(&request);
+        let matched = result.should_block();
+
+        if !matched && result.rewritten_url.is_none() && csp.is_none() {
+            return String::new();
+        }
 
         serde_json::to_string(&NetworkCheckResult {
-            matched: result.should_block(),
+            matched,
             important: result.important,
             exception: result.exception.is_some(),
             redirect: result.redirect,
@@ -339,6 +383,24 @@ pub extern "system" fn Java_com_jhaiian_clint_quiver_engine_QuiverGuardNative_na
         .unwrap_or_else(|_| "{}".to_string())
     });
     make_jstring(&mut env, &json)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_jhaiian_clint_quiver_engine_QuiverGuardNative_nativeScriptletScript(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    url: JString,
+) -> jstring {
+    let script = guard(String::new(), || {
+        if handle == 0 {
+            return String::new();
+        }
+        let url = read_jstring(&mut env, &url);
+        let engine: &Engine = unsafe { &*(handle as *const Engine) };
+        engine.url_cosmetic_resources(&url).injected_script
+    });
+    make_jstring(&mut env, &script)
 }
 
 // Per adblock-rust's own docs on url_cosmetic_resources: generic (non-hostname-specific)

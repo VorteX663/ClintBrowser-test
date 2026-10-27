@@ -10,9 +10,7 @@
 use adblock::resources::{MimeType, PermissionMask, Resource, ResourceType};
 
 /// Permission bit for uBO scriptlets flagged `requiresTrust` (e.g. trusted-set-cookie).
-/// No parsed filter list is currently granted this permission, so these scriptlets are
-/// registered for completeness but cannot be invoked yet. Wire this up to a per-filter-
-/// list "trusted" flag in the future if that's ever needed.
+/// Only granted to the built-in uBlock Origin filter lists, never to user-added lists.
 pub const TRUSTED_SCRIPTLET: PermissionMask = PermissionMask::from_bits(0b0000_0001);
 
 /// Redirect stubs + scriptlets bundled from uBlock Origin, wired into the adblock-rust

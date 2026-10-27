@@ -36,6 +36,10 @@ object DataSaverSiteException {
         cache.clear()
     }
 
+    fun invalidate() {
+        cache.clear()
+    }
+
     fun remove(context: Context, host: String) {
         SitePermissionManager.deleteEntry(
             context.applicationContext, host, SitePermissionDatabase.TYPE_DATA_SAVER_EXCEPTION

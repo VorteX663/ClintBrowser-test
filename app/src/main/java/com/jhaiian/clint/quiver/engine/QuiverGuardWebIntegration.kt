@@ -1,20 +1,36 @@
 package com.jhaiian.clint.quiver.engine
 
 import android.content.Context
+import android.net.Uri
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.preference.PreferenceManager
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase
+import com.jhaiian.clint.settings.sitepermissions.SitePermissionManager
+import com.jhaiian.clint.util.registeredDomain
+import java.io.ByteArrayInputStream
 import java.util.Base64
-import java.util.Collections
-import java.util.WeakHashMap
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 object QuiverGuardWebIntegration {
 
+    const val PREF_ENABLED = "quiver_guard_enabled"
+
     private const val JS_BRIDGE_NAME = "__qgBridge"
 
+    private val scriptKey = "__qg" + UUID.randomUUID().toString().replace("-", "")
+
     @Volatile private var bootstrapScript: String? = null
+
+    private val documentBypassHosts: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    val supportsDocumentStart: Boolean
+        get() = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
 
     private fun bootstrapScript(context: Context): String =
         bootstrapScript ?: synchronized(this) {
@@ -22,16 +38,62 @@ object QuiverGuardWebIntegration {
                 val body = context.assets.open("JavaScript/quiver_guard_cosmetic.js")
                     .bufferedReader().use { it.readText() }
 
-                "(function(){\n$body\n})();".also { bootstrapScript = it }
+                "(function(__qgKey){\n$body\n})('$scriptKey');".also { bootstrapScript = it }
             }
         }
+
+    fun isEnabled(context: Context): Boolean =
+        PreferenceManager.getDefaultSharedPreferences(context).getBoolean(PREF_ENABLED, false)
+
+    fun isExcepted(context: Context, host: String?): Boolean =
+        !host.isNullOrEmpty() && SitePermissionManager.getState(
+            context, host, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION
+        ) != null
+
+    fun isActiveFor(context: Context, pageUrl: String?): Boolean {
+        if (!isEnabled(context)) return false
+        return !isExcepted(context, hostOf(pageUrl))
+    }
 
     fun initialize(context: Context): QuiverGuardEngine.PreloadResult {
         return QuiverGuardEngine.preload(context)
     }
 
-    fun onCompileComplete(context: Context) {
+    fun onCompileComplete(context: Context): Boolean =
         QuiverGuardEngine.activate(QuiverGuardPaths.databaseFile(context).absolutePath)
+
+    fun attach(context: Context, webView: WebView, tabIdProvider: () -> String?) {
+        webView.addJavascriptInterface(QuiverGuardJsBridge(context, webView, tabIdProvider), JS_BRIDGE_NAME)
+        if (supportsDocumentStart) {
+            WebViewCompat.addDocumentStartJavaScript(webView, bootstrapScript(context), setOf("*"))
+        }
+    }
+
+    fun fallbackBootstrapScript(context: Context): String? =
+        if (supportsDocumentStart) null else bootstrapScript(context)
+
+    fun fallbackScriptletScript(pageUrl: String): String? =
+        if (supportsDocumentStart) null else scriptletScriptFor(pageUrl)
+
+    internal fun scriptletScriptFor(pageUrl: String): String? {
+        val script = QuiverGuardEngine.scriptletScript(pageUrl)
+        if (script.isNullOrBlank()) return null
+        return "(function(){if(window['${scriptKey}a']!==true)return;\n$script\n})();"
+    }
+
+    fun allowBlockedDocument(url: String) {
+        hostOf(url)?.lowercase()?.let { documentBypassHosts.add(it) }
+    }
+
+    fun mainFrameRewrite(context: Context, url: String): String? {
+        if (!isActiveFor(context, url)) return null
+        if (!QuiverGuardEngine.isLoaded) return null
+        val uri = Uri.parse(url)
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return null
+        val check = QuiverGuardEngine.checkNetworkRequest(url, url, "document", "GET") ?: return null
+        if (check.matched) return null
+        return check.rewrittenUrl?.takeIf { it != url }
     }
 
     fun shouldInterceptRequest(
@@ -39,46 +101,107 @@ object QuiverGuardWebIntegration {
         request: WebResourceRequest,
         pageUrl: String?,
         tabId: String,
-        isQuiverGuardEnabled: Boolean
+        cookieManager: CookieManager?,
+        onMainFrameRewrite: (String) -> Unit,
+        onDocumentBlocked: (String) -> Unit,
     ): WebResourceResponse? {
-        if (!isQuiverGuardEnabled) return null
-        if (!QuiverGuardEngine.isLoaded) {
-            QuiverGuardEngine.preload(context)
-            if (!QuiverGuardEngine.isLoaded) return null
-        }
+        if (!ensureLoaded(context)) return null
 
         val requestUrl = request.url ?: return null
         val scheme = requestUrl.scheme?.lowercase() ?: return null
-        if (scheme != "http" && scheme != "https" && scheme != "ws" && scheme != "wss") return null
+        if (scheme != "http" && scheme != "https") return null
 
         val urlStr = requestUrl.toString()
         val resourceType = ResourceTypeDetector.detect(request)
+        val sourceUrl = if (request.isForMainFrame) urlStr else pageUrl ?: urlStr
+        val method = request.method ?: "GET"
 
-        val sourceUrl = pageUrl ?: urlStr
-
-        val check = QuiverGuardEngine.checkNetworkRequest(urlStr, sourceUrl, resourceType, request.method ?: "GET") ?: return null
+        val check = QuiverGuardEngine.checkNetworkRequest(urlStr, sourceUrl, resourceType, method) ?: return null
 
         if (check.matched) {
-            BlockedRequestCounter.increment(tabId)
+            if (!request.isForMainFrame) {
+                BlockedRequestCounter.increment(tabId)
+                check.redirectDataUrl?.let { decodeDataUrlResponse(it) }?.let { return it }
+                return BlockedResponse.forResourceType(resourceType)
+            }
+            val host = requestUrl.host?.lowercase()
+            if (host == null || host !in documentBypassHosts) {
+                BlockedRequestCounter.increment(tabId)
+                onDocumentBlocked(urlStr)
+                return emptyDocument()
+            }
+        }
 
-            check.redirectDataUrl?.let { decodeDataUrlResponse(it) }?.let { return it }
-            return BlockedResponse.forResourceType(resourceType)
+        if (request.isForMainFrame && method.equals("GET", ignoreCase = true)) {
+            val rewritten = check.rewrittenUrl
+            if (rewritten != null && rewritten != urlStr) {
+                onMainFrameRewrite(rewritten)
+                return emptyDocument()
+            }
         }
 
         val addHeaders = LinkedHashMap<String, String>()
         check.csp?.let { addHeaders["Content-Security-Policy"] = it }
 
         if (check.rewrittenUrl != null || addHeaders.isNotEmpty()) {
+            val sameSite = isSameSite(urlStr, sourceUrl)
             val modification = PassthroughFetcher.Modification(
                 newUrl = check.rewrittenUrl,
                 addResponseHeaders = addHeaders,
             )
-            val modifiedResponse = PassthroughFetcher.fetch(request, modification)
-            if (modifiedResponse != null) return modifiedResponse
+            PassthroughFetcher.fetch(request, modification, if (sameSite) cookieManager else null)?.let { return it }
         }
 
         return null
     }
+
+    fun shouldInterceptServiceWorkerRequest(
+        context: Context,
+        request: WebResourceRequest,
+        fallbackPageUrl: String?,
+        tabId: String?,
+    ): WebResourceResponse? {
+        if (!isEnabled(context)) return null
+        val referer = request.requestHeaders?.entries
+            ?.firstOrNull { it.key.equals("Referer", ignoreCase = true) }?.value
+            ?.takeIf { it.isNotEmpty() }
+        val pageUrl = referer ?: fallbackPageUrl
+        if (isExcepted(context, hostOf(pageUrl))) return null
+        if (!ensureLoaded(context)) return null
+
+        val requestUrl = request.url ?: return null
+        val scheme = requestUrl.scheme?.lowercase() ?: return null
+        if (scheme != "http" && scheme != "https") return null
+
+        val urlStr = requestUrl.toString()
+        val resourceType = ResourceTypeDetector.detect(request)
+        val check = QuiverGuardEngine.checkNetworkRequest(
+            urlStr, pageUrl ?: urlStr, resourceType, request.method ?: "GET"
+        ) ?: return null
+        if (!check.matched) return null
+
+        tabId?.let { BlockedRequestCounter.increment(it) }
+        check.redirectDataUrl?.let { decodeDataUrlResponse(it) }?.let { return it }
+        return BlockedResponse.forResourceType(resourceType)
+    }
+
+    private fun ensureLoaded(context: Context): Boolean {
+        if (QuiverGuardEngine.isLoaded) return true
+        QuiverGuardEngine.preload(context)
+        return QuiverGuardEngine.isLoaded
+    }
+
+    private fun hostOf(url: String?): String? =
+        url?.let { runCatching { Uri.parse(it).host }.getOrNull() }?.takeIf { it.isNotEmpty() }
+
+    private fun isSameSite(url: String, sourceUrl: String): Boolean {
+        val host = hostOf(url) ?: return false
+        val sourceHost = hostOf(sourceUrl) ?: return false
+        return registeredDomain(host).equals(registeredDomain(sourceHost), ignoreCase = true)
+    }
+
+    private fun emptyDocument(): WebResourceResponse =
+        WebResourceResponse("text/html", "utf-8", ByteArrayInputStream(ByteArray(0)))
 
     private fun decodeDataUrlResponse(dataUrl: String): WebResourceResponse? {
         if (!dataUrl.startsWith("data:")) return null
@@ -97,56 +220,5 @@ object QuiverGuardWebIntegration {
             BlockedResponse.BASE_HEADERS + mapOf("Content-Type" to mime),
             bytes.inputStream()
         )
-    }
-
-    fun buildCosmeticFilterScript(
-        context: Context,
-        @Suppress("UNUSED_PARAMETER") pageUrl: String,
-        isQuiverGuardEnabled: Boolean
-    ): String? {
-        if (!isQuiverGuardEnabled) return null
-        return bootstrapScript(context)
-    }
-
-    fun applyCosmeticFilterScript(webView: WebView, script: String) {
-        ensureBridgeInstalled(webView)
-        webView.evaluateJavascript(script, null)
-    }
-
-    fun buildDocumentStartScript(
-        context: Context,
-        @Suppress("UNUSED_PARAMETER") pageUrl: String,
-        isQuiverGuardEnabled: Boolean
-    ): String? {
-        if (!isQuiverGuardEnabled) return null
-        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return null
-        return bootstrapScript(context)
-    }
-
-    fun applyDocumentStartScript(
-        webView: WebView,
-        tabScriptHandlers: ScriptHandlerStore,
-        tabId: String,
-        script: String
-    ) {
-        ensureBridgeInstalled(webView)
-        tabScriptHandlers.remove(tabId)
-        val handler = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
-        tabScriptHandlers.put(tabId, handler)
-    }
-
-    fun installEarly(context: Context, webView: WebView) {
-        ensureBridgeInstalled(webView)
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            WebViewCompat.addDocumentStartJavaScript(webView, bootstrapScript(context), setOf("*"))
-        }
-    }
-
-    private val bridgedWebViews = Collections.newSetFromMap(WeakHashMap<WebView, Boolean>())
-
-    private fun ensureBridgeInstalled(webView: WebView) {
-        if (bridgedWebViews.add(webView)) {
-            webView.addJavascriptInterface(QuiverGuardJsBridge, JS_BRIDGE_NAME)
-        }
     }
 }

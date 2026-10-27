@@ -2,7 +2,6 @@ package com.jhaiian.clint.quiver
 
 import android.content.Context
 import android.os.SystemClock
-import android.webkit.CookieManager
 import android.webkit.WebSettings
 import com.jhaiian.clint.R
 import com.jhaiian.clint.downloads.ClintDownloadManager
@@ -14,6 +13,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -53,6 +54,8 @@ internal object FilterListUpdateChecker {
     private const val MIN_VALID_LINE_COUNT = 3
     private const val PROGRESS_EMIT_INTERVAL_MS = 80L
 
+    private val updateMutex = Mutex()
+
     fun checkAndUpdateAll(
         context: Context,
         filterLists: List<FilterList>,
@@ -66,8 +69,10 @@ internal object FilterListUpdateChecker {
             currentCoroutineContext().ensureActive()
             emit(FilterListUpdateEvent.CheckingList(filterList, index, total))
 
-            val result = tryCheckAndUpdate(appContext, filterList, forceUpdate) { bytesRead, totalBytes ->
-                emit(FilterListUpdateEvent.DownloadingList(filterList, bytesRead, totalBytes))
+            val result = updateMutex.withLock {
+                tryCheckAndUpdate(appContext, filterList, forceUpdate) { bytesRead, totalBytes ->
+                    emit(FilterListUpdateEvent.DownloadingList(filterList, bytesRead, totalBytes))
+                }
             }
             currentCoroutineContext().ensureActive()
             emit(FilterListUpdateEvent.ItemComplete(result))
@@ -84,21 +89,12 @@ internal object FilterListUpdateChecker {
         val tempFile = File(targetFile.parentFile, "${targetFile.name}.update.part")
 
         return try {
-            val cookie = try {
-                CookieManager.getInstance().getCookie(filterList.downloadUrl)
-            } catch (_: Exception) {
-                null
-            }
             val userAgent = WebSettings.getDefaultUserAgent(context)
 
             val requestBuilder = Request.Builder()
                 .url(filterList.downloadUrl)
                 .header("User-Agent", userAgent)
                 .header("Accept", "text/plain, */*;q=0.8")
-
-            if (!cookie.isNullOrBlank()) {
-                requestBuilder.header("Cookie", cookie)
-            }
 
             if (!forceUpdate) {
                 if (!filterList.etag.isNullOrBlank()) {

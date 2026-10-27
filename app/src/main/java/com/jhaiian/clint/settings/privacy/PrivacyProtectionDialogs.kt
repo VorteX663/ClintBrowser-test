@@ -92,15 +92,17 @@ internal fun ClearOnExitDialog(
     history: Boolean,
     cookies: Boolean,
     cache: Boolean,
+    tabs: Boolean,
     hideStatusBar: Boolean,
     hideSystemNavigation: Boolean,
-    onConfirm: (history: Boolean, cookies: Boolean, cache: Boolean) -> Unit,
+    onConfirm: (history: Boolean, cookies: Boolean, cache: Boolean, tabs: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val colors = LocalClintColors.current
     var historyChecked by remember(history) { mutableStateOf(history) }
     var cookiesChecked by remember(cookies) { mutableStateOf(cookies) }
     var cacheChecked by remember(cache) { mutableStateOf(cache) }
+    var tabsChecked by remember(tabs) { mutableStateOf(tabs) }
 
     ClintDialog(
         title = stringResource(R.string.clear_on_exit_items_title),
@@ -111,7 +113,7 @@ internal fun ClearOnExitDialog(
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(android.R.string.cancel), color = colors.primary, fontWeight = FontWeight.Medium)
                 }
-                TextButton(onClick = { onConfirm(historyChecked, cookiesChecked, cacheChecked) }) {
+                TextButton(onClick = { onConfirm(historyChecked, cookiesChecked, cacheChecked, tabsChecked) }) {
                     Text(stringResource(android.R.string.ok), color = colors.primary, fontWeight = FontWeight.Medium)
                 }
             }
@@ -120,6 +122,7 @@ internal fun ClearOnExitDialog(
         CheckOption(R.string.clear_on_exit_history, historyChecked) { historyChecked = it }
         CheckOption(R.string.clear_on_exit_cookies, cookiesChecked) { cookiesChecked = it }
         CheckOption(R.string.clear_on_exit_cache, cacheChecked) { cacheChecked = it }
+        CheckOption(R.string.clear_on_exit_tabs, tabsChecked) { tabsChecked = it }
     }
 }
 

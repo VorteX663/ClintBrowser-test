@@ -1,6 +1,6 @@
 # Terms of Service for Clint Browser
 
-*Last updated: September 29, 2026*
+*Last updated: October 27, 2026*
 
 ## 1. What These Terms Cover
 
@@ -17,6 +17,7 @@ Clint Browser is a **free, open‑source Android browser** built around privacy.
 - Block entire categories of sites at the domain level with Website Blocker.
 - Set your own search engine and search suggestions provider, including fully custom ones you point at any URL.
 - Run your own user scripts to customize how pages behave.
+- Translate pages on your device with Page Translation.
 - Incognito sessions are completely isolated..
 - You can view, modify, or share the source code under the GPL‑v3 license.
 
@@ -70,7 +71,13 @@ Media Capture works by inspecting webpage content and network requests, and by i
 
 You are responsible for making sure your use of Media Capture, including any content you download with it, complies with the terms of the websites you visit and any applicable copyright or other laws.
 
-## 9. No Warranty
+## 9. Page Translation
+
+Clint Browser can translate web pages using Firefox's translation engine, which runs on your device. The language files it needs are downloaded from Mozilla, a third party the developer doesn't control.
+
+Translations are produced automatically by machine translation and **can be inaccurate, incomplete, or misleading**. They may change the meaning of the original text. Don't rely on a translation for anything important, such as legal, medical, financial, or safety information, without checking the original page. The developer is not responsible for errors in translations or for any decisions you make based on them.
+
+## 10. No Warranty
 
 Clint Browser is provided **"as is"** and **"as available"**. To the maximum extent permitted by law, the developer disclaims all warranties, express or implied, including:
 
@@ -81,19 +88,20 @@ Clint Browser is provided **"as is"** and **"as available"**. To the maximum ext
 
 You use the app entirely at your own risk.
 
-## 10. Limitation of Liability
+## 11. Limitation of Liability
 
 In no event shall the developer be liable for any damages arising from your use of Clint Browser, including but not limited to:
 
 - Data loss or corruption
 - Device damage
 - Security breaches caused by websites you visit
-- Issues with third‑party services (such as search engines, search suggestions providers, or user script sources)
+- Issues with third‑party services (such as search engines, search suggestions providers, user script sources, or translation file downloads)
+- Inaccurate machine translations
 - Any indirect, incidental, or consequential damages
 
 Some jurisdictions do not allow certain liability exclusions. In those cases, this limitation applies to the fullest extent permitted by law.
 
-## 11. Third‑Party Content
+## 12. Third‑Party Content
 
 Clint Browser is a **browser**, it renders content from websites, search engines, and online services that are completely outside the developer's control. We do not:
 
@@ -102,15 +110,15 @@ Clint Browser is a **browser**, it renders content from websites, search engines
 
 You are responsible for your own browsing choices.
 
-## 12. Changes to These Terms
+## 13. Changes to These Terms
 
 These Terms may be updated occasionally. Changes will be posted on the GitHub repository. The app will always link to the latest version. If you continue using Clint Browser after an update, you accept the new Terms.
 
-## 13. Governing Law
+## 14. Governing Law
 
 These Terms are governed by the laws of the Philippines. If you live elsewhere, your local consumer rights may also apply.
 
-## 14. Contact
+## 15. Contact
 
 For questions or permission requests:
 

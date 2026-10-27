@@ -3,7 +3,6 @@ package com.jhaiian.clint.quiver
 import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
-import android.webkit.CookieManager
 import android.webkit.WebSettings
 import com.jhaiian.clint.R
 import com.jhaiian.clint.downloads.ClintDownloadManager
@@ -58,20 +57,12 @@ internal object CustomFilterListFetcher {
         val appContext = context.applicationContext
         val tempFile = tempFileFor(appContext)
 
-        val cookie = try {
-            CookieManager.getInstance().getCookie(url)
-        } catch (_: Exception) {
-            null
-        }
         val userAgent = WebSettings.getDefaultUserAgent(appContext)
 
         val requestBuilder = Request.Builder()
             .url(url)
             .header("User-Agent", userAgent)
             .header("Accept", "text/plain, */*;q=0.8")
-        if (!cookie.isNullOrBlank()) {
-            requestBuilder.header("Cookie", cookie)
-        }
 
         val call = ClintDownloadManager.httpClient.newCall(requestBuilder.build())
 

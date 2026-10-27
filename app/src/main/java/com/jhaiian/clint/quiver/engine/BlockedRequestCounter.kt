@@ -14,20 +14,22 @@ object BlockedRequestCounter {
 
     private val tabCounters = ConcurrentHashMap<String, AtomicLong>()
 
+    private val globalCounter = AtomicLong(0L)
+
     private val _globalCount = MutableStateFlow(0L)
     val globalCount: StateFlow<Long> = _globalCount.asStateFlow()
 
     private val _activeTabCount = MutableStateFlow(0L)
     val activeTabCount: StateFlow<Long> = _activeTabCount.asStateFlow()
 
-    private var activeTabId: String? = null
+    @Volatile private var activeTabId: String? = null
 
     fun increment(tabId: String) {
         val counter = tabCounters.getOrPut(tabId) { AtomicLong(0L) }
         counter.incrementAndGet()
-        val newGlobal = _globalCount.value + 1L
+        globalCounter.incrementAndGet()
         mainHandler.post {
-            _globalCount.value = newGlobal
+            _globalCount.value = globalCounter.get()
             if (tabId == activeTabId) {
                 _activeTabCount.value = counter.get()
             }

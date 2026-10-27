@@ -93,6 +93,7 @@ fun QuiverGuardScreen(
     maxContentWidth: Dp?,
     onExit: () -> Unit,
     onMasterToggle: (Boolean) -> Unit,
+    onAutoUpdateToggle: (Boolean) -> Unit,
     onManualFilterClick: () -> Unit,
     onItemClick: (FilterList) -> Unit,
     onAddFromFileClick: () -> Unit,
@@ -173,6 +174,11 @@ fun QuiverGuardScreen(
             }
 
             MasterSwitchRow(masterEnabled = state.masterEnabled, onToggle = onMasterToggle)
+            AutoUpdateSwitchRow(
+                autoUpdateEnabled = state.autoUpdateEnabled,
+                masterEnabled = state.masterEnabled,
+                onToggle = onAutoUpdateToggle
+            )
 
             Text(
                 stringResource(R.string.quiver_guard_section_filter_lists),
@@ -258,6 +264,22 @@ private fun MasterSwitchRow(masterEnabled: Boolean, onToggle: (Boolean) -> Unit)
         onClick = { onToggle(!masterEnabled) },
         trailing = {
             ClintSwitch(checked = masterEnabled)
+        }
+    )
+}
+
+@Composable
+private fun AutoUpdateSwitchRow(autoUpdateEnabled: Boolean, masterEnabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val colors = LocalClintColors.current
+    SettingsRow(
+        icon = androidx.compose.material.icons.Icons.Filled.Update,
+        title = stringResource(R.string.quiver_guard_auto_update_title),
+        summary = stringResource(R.string.quiver_guard_auto_update_summary),
+        colors = colors,
+        enabled = masterEnabled,
+        onClick = { if (masterEnabled) onToggle(!autoUpdateEnabled) },
+        trailing = {
+            ClintSwitch(checked = autoUpdateEnabled)
         }
     )
 }

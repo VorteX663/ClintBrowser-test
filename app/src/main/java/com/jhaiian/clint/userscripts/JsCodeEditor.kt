@@ -33,8 +33,9 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -408,15 +409,15 @@ private fun FindReplaceBar(
                 IconButton(onClick = { codeView?.clearMatches(); onClose() }) {
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_close_search), tint = colors.iconTint)
                 }
+                val queryState = com.jhaiian.clint.ui.rememberSyncedTextFieldState(query) { runSearch(it) }
                 BasicTextField(
-                    value = query,
-                    onValueChange = { runSearch(it) },
-                    singleLine = true,
+                    state = queryState,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle = TextStyle(color = colors.onSurface, fontSize = 15.sp),
                     cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { codeView?.findNextMatch() }),
-                    decorationBox = { inner ->
+                    onKeyboardAction = { codeView?.findNextMatch() },
+                    decorator = TextFieldDecorator { inner ->
                         if (query.isEmpty()) {
                             Text(stringResource(R.string.user_scripts_editor_find_hint), color = colors.secondaryText, fontSize = 15.sp)
                         }
@@ -450,15 +451,15 @@ private fun FindReplaceBar(
             }
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.width(48.dp))
+                val replacementState = com.jhaiian.clint.ui.rememberSyncedTextFieldState(replacement) { replacement = it }
                 BasicTextField(
-                    value = replacement,
-                    onValueChange = { replacement = it },
-                    singleLine = true,
+                    state = replacementState,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle = TextStyle(color = colors.onSurface, fontSize = 15.sp),
                     cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
-                    decorationBox = { inner ->
+                    onKeyboardAction = { keyboardController?.hide() },
+                    decorator = TextFieldDecorator { inner ->
                         if (replacement.isEmpty()) {
                             Text(stringResource(R.string.user_scripts_editor_replace_hint), color = colors.secondaryText, fontSize = 15.sp)
                         }

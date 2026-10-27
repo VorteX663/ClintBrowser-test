@@ -17,18 +17,15 @@ import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.VisibilityOff
 
-import androidx.compose.foundation.layout.padding
 import com.jhaiian.clint.ui.ClintSwitch
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.jhaiian.clint.R
 import com.jhaiian.clint.settings.common.RowDivider
 import com.jhaiian.clint.settings.common.SettingsRow
 import com.jhaiian.clint.settings.common.SettingsScreenScaffold
 import com.jhaiian.clint.settings.common.SettingsSection
-import com.jhaiian.clint.setup.SectionLabel
+import com.jhaiian.clint.settings.common.SettingsSectionLabel
 import com.jhaiian.clint.ui.theme.LocalClintColors
 
 @Composable
@@ -42,7 +39,7 @@ fun PrivacySettingsScreen(
     onGlobalPrivacyControlClick: () -> Unit,
     onWebRtcProtectionClick: () -> Unit,
     onClearOnExitClick: () -> Unit,
-    onClearOnExitConfirmed: (history: Boolean, cookies: Boolean, cache: Boolean) -> Unit,
+    onClearOnExitConfirmed: (history: Boolean, cookies: Boolean, cache: Boolean, tabs: Boolean) -> Unit,
     onAppLockClick: () -> Unit,
     onAppLockTimeoutConfirmed: (Int) -> Unit,
     onScreenshotBlockingClick: () -> Unit,
@@ -50,17 +47,19 @@ fun PrivacySettingsScreen(
     onClipboardClearConfirmed: (Int) -> Unit,
     onAutofillClick: () -> Unit,
     onAutofillServiceClick: () -> Unit,
-    onHistoryClick: () -> Unit
+    onHistoryClick: () -> Unit,
+    onDeleteBrowsingDataClick: () -> Unit
 ) {
     val colors = LocalClintColors.current
     val historyLabel = stringResource(R.string.clear_on_exit_history)
     val cookiesLabel = stringResource(R.string.clear_on_exit_cookies)
     val cacheLabel = stringResource(R.string.clear_on_exit_cache)
+    val tabsLabel = stringResource(R.string.clear_on_exit_tabs)
     val nothingLabel = stringResource(R.string.clear_on_exit_none)
 
     SettingsScreenScaffold {
 
-        SectionLabel(stringResource(R.string.privacy_section_privacy), colors.primary, Modifier.padding(start = 4.dp, bottom = 8.dp))
+        SettingsSectionLabel(stringResource(R.string.privacy_section_privacy))
         SettingsSection(colors.cardBackground) {
             SettingsRow(
                 icon = androidx.compose.material.icons.Icons.Filled.Cookie,
@@ -107,7 +106,7 @@ fun PrivacySettingsScreen(
             )
         }
 
-        SectionLabel(stringResource(R.string.privacy_section_tracking), colors.primary, Modifier.padding(start = 4.dp, bottom = 8.dp))
+        SettingsSectionLabel(stringResource(R.string.privacy_section_tracking))
         SettingsSection(colors.cardBackground) {
             SettingsRow(
                 icon = androidx.compose.material.icons.Icons.Filled.LinkOff,
@@ -143,7 +142,7 @@ fun PrivacySettingsScreen(
             )
         }
 
-        SectionLabel(stringResource(R.string.privacy_section_device), colors.primary, Modifier.padding(start = 4.dp, bottom = 8.dp))
+        SettingsSectionLabel(stringResource(R.string.privacy_section_device))
         SettingsSection(colors.cardBackground) {
             SettingsRow(
                 icon = androidx.compose.material.icons.Icons.Filled.PhonelinkLock,
@@ -214,7 +213,8 @@ fun PrivacySettingsScreen(
                     summary = listOfNotNull(
                         historyLabel.takeIf { state.clearHistory },
                         cookiesLabel.takeIf { state.clearCookies },
-                        cacheLabel.takeIf { state.clearCache }
+                        cacheLabel.takeIf { state.clearCache },
+                        tabsLabel.takeIf { state.clearTabs }
                     ).joinToString(", ").ifEmpty { nothingLabel },
                     colors = colors,
                     onClick = { state.clearOnExitDialogOpen = true }
@@ -223,7 +223,7 @@ fun PrivacySettingsScreen(
         }
 
         if (state.autofillSupported) {
-            SectionLabel(stringResource(R.string.privacy_section_autofill), colors.primary, Modifier.padding(start = 4.dp, bottom = 8.dp))
+            SettingsSectionLabel(stringResource(R.string.privacy_section_autofill))
             SettingsSection(colors.cardBackground) {
                 SettingsRow(
                     icon = androidx.compose.material.icons.Icons.Filled.Password,
@@ -248,7 +248,7 @@ fun PrivacySettingsScreen(
             }
         }
 
-        SectionLabel(stringResource(R.string.privacy_section_history), colors.primary, Modifier.padding(start = 4.dp, bottom = 8.dp))
+        SettingsSectionLabel(stringResource(R.string.privacy_section_history))
         SettingsSection(colors.cardBackground) {
             SettingsRow(
                 icon = androidx.compose.material.icons.Icons.Filled.History,
@@ -256,6 +256,14 @@ fun PrivacySettingsScreen(
                 summary = stringResource(R.string.history_summary),
                 colors = colors,
                 onClick = onHistoryClick
+            )
+            RowDivider(colors.divider)
+            SettingsRow(
+                icon = androidx.compose.material.icons.Icons.Filled.DeleteSweep,
+                title = stringResource(R.string.delete_data_title),
+                summary = stringResource(R.string.delete_data_settings_summary),
+                colors = colors,
+                onClick = onDeleteBrowsingDataClick
             )
         }
     }
@@ -287,6 +295,7 @@ fun PrivacySettingsScreen(
             history = state.clearHistory,
             cookies = state.clearCookies,
             cache = state.clearCache,
+            tabs = state.clearTabs,
             hideStatusBar = state.hideStatusBar, hideSystemNavigation = state.hideSystemNavigation,
             onConfirm = onClearOnExitConfirmed,
             onDismiss = { state.clearOnExitDialogOpen = false }

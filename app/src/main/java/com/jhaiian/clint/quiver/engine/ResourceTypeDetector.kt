@@ -4,66 +4,78 @@ import android.webkit.WebResourceRequest
 
 object ResourceTypeDetector {
 
-    private val SCRIPT_EXTENSIONS = setOf("js", "mjs", "jsx", "ts")
+    private val SCRIPT_EXTENSIONS = setOf("js", "mjs", "jsx")
     private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "avif")
     private val STYLESHEET_EXTENSIONS = setOf("css", "less", "scss")
     private val FONT_EXTENSIONS = setOf("woff", "woff2", "ttf", "otf", "eot")
-    private val MEDIA_EXTENSIONS = setOf("mp4", "webm", "mp3", "ogg", "flac", "wav", "avi", "mov", "m4v", "m3u8", "mkv", "opus")
+    private val MEDIA_EXTENSIONS = setOf("mp4", "webm", "mp3", "ogg", "flac", "wav", "avi", "mov", "m4v", "m3u8", "mkv", "opus", "m4s", "ts", "aac", "mpd")
+    private val XHR_EXTENSIONS = setOf("json", "xml")
 
     fun detect(request: WebResourceRequest): String {
-        val scheme = request.url.scheme?.lowercase() ?: ""
+        if (request.isForMainFrame) return "document"
 
-        if (scheme == "ws" || scheme == "wss") return "websocket"
+        val headers = request.requestHeaders.orEmpty()
+        val destination = headers.headerValue("Sec-Fetch-Dest").lowercase()
+        val mode = headers.headerValue("Sec-Fetch-Mode").lowercase()
+        val accept = headers.headerValue("Accept").lowercase()
+        val method = request.method?.uppercase() ?: "GET"
 
-        val accept = request.requestHeaders?.get("Accept") ?: ""
-        val destination = request.requestHeaders?.get("Sec-Fetch-Dest") ?: ""
-        val mode = request.requestHeaders?.get("Sec-Fetch-Mode") ?: ""
-
-        when (destination.lowercase()) {
-            "script" -> return "script"
+        when (destination) {
+            "script", "worker", "sharedworker", "serviceworker", "audioworklet", "paintworklet" -> return "script"
             "style" -> return "stylesheet"
-            "image", "img" -> return "image"
+            "image" -> return "image"
             "font" -> return "font"
-            "media", "video", "audio" -> return "media"
-            "worker", "sharedworker", "serviceworker" -> return "script"
-            "iframe", "frame" -> return "sub_frame"
-            "document" -> return if (request.isForMainFrame) "document" else "sub_frame"
+            "audio", "video", "track" -> return "media"
+            "iframe", "frame", "document" -> return "sub_frame"
             "object", "embed" -> return "object"
-            "track" -> return "media"
+            "report" -> return "csp_report"
             "manifest" -> return "other"
+            "empty" -> return "xhr"
         }
 
-        when (mode.lowercase()) {
-            "cors", "no-cors" -> {
-                if (accept.contains("application/json") || accept.contains("text/plain")) return "xhr"
-            }
-            "websocket" -> return "websocket"
-            "navigate" -> return if (request.isForMainFrame) "document" else "sub_frame"
+        if (mode == "navigate" || mode == "nested-navigate") return "sub_frame"
+        if (method != "GET" && method != "HEAD") return "xhr"
+
+        when {
+            accept.startsWith("text/html") || accept.startsWith("application/xhtml+xml") -> return "sub_frame"
+            accept.startsWith("text/css") -> return "stylesheet"
+            accept.startsWith("image/") -> return "image"
+            accept.startsWith("audio/") || accept.startsWith("video/") -> return "media"
+            accept.startsWith("font/") || accept.startsWith("application/font") -> return "font"
+            accept.contains("javascript") || accept.contains("ecmascript") -> return "script"
+            accept.contains("application/json") || accept.startsWith("text/plain") ||
+                accept.startsWith("application/xml") || accept.startsWith("text/event-stream") -> return "xhr"
         }
 
-        if (accept.isNotEmpty()) {
-            return when {
-                accept.contains("text/html") && request.isForMainFrame -> "document"
-                accept.contains("text/html") -> "sub_frame"
-                accept.contains("text/css") -> "stylesheet"
-                accept.contains("image/") -> "image"
-                accept.contains("application/javascript") || accept.contains("text/javascript") -> "script"
-                accept.contains("font/") || accept.contains("application/font") -> "font"
-                accept.contains("audio/") || accept.contains("video/") -> "media"
-                else -> "other"
-            }
+        val path = request.url.path?.lowercase().orEmpty()
+        val ext = path.substringAfterLast('/').substringAfterLast('.', "")
+        when (ext) {
+            in SCRIPT_EXTENSIONS -> return "script"
+            in IMAGE_EXTENSIONS -> return "image"
+            in STYLESHEET_EXTENSIONS -> return "stylesheet"
+            in FONT_EXTENSIONS -> return "font"
+            in MEDIA_EXTENSIONS -> return "media"
+            in XHR_EXTENSIONS -> return "xhr"
         }
 
-        val path = request.url.path?.lowercase() ?: ""
-        val ext = path.substringAfterLast('.', "").substringBefore('?').substringBefore('#')
-        return when {
-            ext in SCRIPT_EXTENSIONS -> "script"
-            ext in IMAGE_EXTENSIONS -> "image"
-            ext in STYLESHEET_EXTENSIONS -> "stylesheet"
-            ext in FONT_EXTENSIONS -> "font"
-            ext in MEDIA_EXTENSIONS -> "media"
-
-            else -> "xhr"
+        if (headers.hasHeader("Range")) return "media"
+        if (headers.hasHeader("Origin") || headers.hasHeader("Content-Type") ||
+            headers.headerValue("X-Requested-With").equals("XMLHttpRequest", ignoreCase = true)
+        ) {
+            return "xhr"
         }
+
+        return "script"
     }
+
+    private fun Map<String, String>.headerValue(name: String): String {
+        get(name)?.let { return it }
+        for ((key, value) in this) {
+            if (key.equals(name, ignoreCase = true)) return value
+        }
+        return ""
+    }
+
+    private fun Map<String, String>.hasHeader(name: String): Boolean =
+        containsKey(name) || keys.any { it.equals(name, ignoreCase = true) }
 }

@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ChromeReaderMode
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,9 +40,11 @@ enum class CustomizableMenuItem(val id: String) {
     BOOKMARKS("bookmarks"),
     HISTORY("history"),
     READER_MODE("reader_mode"),
+    TRANSLATE("translate"),
     DESKTOP_MODE("desktop_mode"),
     DATA_SAVER("data_saver"),
     DISABLE_DATA_SAVER_FOR_SITE("disable_data_saver_for_site"),
+    MUTE_TAB("mute_tab"),
     COOKIES_CONTROL("cookies_control");
 
     companion object {
@@ -65,9 +69,11 @@ fun CustomizableMenuItem.icon(): ImageVector = when (this) {
     CustomizableMenuItem.BOOKMARKS -> Icons.Filled.BookmarkBorder
     CustomizableMenuItem.HISTORY -> Icons.Filled.History
     CustomizableMenuItem.READER_MODE -> Icons.AutoMirrored.Filled.ChromeReaderMode
+    CustomizableMenuItem.TRANSLATE -> Icons.Filled.Translate
     CustomizableMenuItem.DESKTOP_MODE -> Icons.Filled.DesktopWindows
     CustomizableMenuItem.DATA_SAVER -> Icons.Filled.DataSaverOn
     CustomizableMenuItem.DISABLE_DATA_SAVER_FOR_SITE -> Icons.Filled.DataSaverOff
+    CustomizableMenuItem.MUTE_TAB -> Icons.AutoMirrored.Filled.VolumeOff
     CustomizableMenuItem.COOKIES_CONTROL -> CookieIcon
 }
 
@@ -87,9 +93,11 @@ fun CustomizableMenuItem.titleRes(): Int = when (this) {
     CustomizableMenuItem.BOOKMARKS -> R.string.menu_bookmarks
     CustomizableMenuItem.HISTORY -> R.string.menu_history
     CustomizableMenuItem.READER_MODE -> R.string.reader_mode
+    CustomizableMenuItem.TRANSLATE -> R.string.translation_menu_translate
     CustomizableMenuItem.DESKTOP_MODE -> R.string.desktop_mode
     CustomizableMenuItem.DATA_SAVER -> R.string.menu_data_saver
     CustomizableMenuItem.DISABLE_DATA_SAVER_FOR_SITE -> R.string.menu_disable_data_saver_for_site
+    CustomizableMenuItem.MUTE_TAB -> R.string.menu_mute_tab
     CustomizableMenuItem.COOKIES_CONTROL -> R.string.menu_cookies_control
 }
 

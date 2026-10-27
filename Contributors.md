@@ -38,4 +38,3 @@
 - [@34NANAKO34](https://github.com/34NANAKO34)
 - [u/Interesting-Stick641](https://www.reddit.com/user/Interesting-Stick641)
 - [u/ManFromUrth](https://www.reddit.com/user/ManFromUrth)
-- Daniel Rioja

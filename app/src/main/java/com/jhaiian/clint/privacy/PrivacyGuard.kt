@@ -165,7 +165,7 @@ object PrivacyGuard {
     }
 
     @SuppressLint("RequiresFeature")
-    private fun clearCookiesAndSiteData() {
+    internal fun clearCookiesAndSiteData() {
         runCatching {
             val cookies = CookieManager.getInstance()
             cookies.removeAllCookies(null)
@@ -180,7 +180,7 @@ object PrivacyGuard {
         }
     }
 
-    private fun clearCache(context: Context) {
+    internal fun clearCache(context: Context) {
         runCatching {
             val webView = WebView(context)
             webView.clearCache(true)

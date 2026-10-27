@@ -75,9 +75,13 @@ internal fun MainActivity.createWebView(isIncognito: Boolean, profileId: String 
     webView.addJavascriptInterface(ColorPickerBridge(this, webView), "ColorPickerBridge")
     webView.addJavascriptInterface(DataSaverBridge(applicationContext), "ClintDataSaverBridge")
     webView.addJavascriptInterface(MediaScanBridge(prefs) { runCatching { tabManager.tabs.find { it.webView === webView }?.id }.getOrNull() }, MediaScanBridge.NAME)
+    webView.addJavascriptInterface(webView.translator.bridge, "ClintTranslateBridge")
+    installBackgroundPlaybackBridge(webView)
+    webView.destroyListener = { onBackgroundPlaybackWebViewDestroyed(webView) }
+    webView.keepVisibleInBackground = { keepsMediaAlive(webView) }
 
-    if (prefs.getBoolean("quiver_guard_enabled", false)) {
-        QuiverGuardWebIntegration.installEarly(this, webView)
+    QuiverGuardWebIntegration.attach(this, webView) {
+        runCatching { tabManager.tabs.find { it.webView === webView }?.id }.getOrNull()
     }
     webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
         if (tabManager.activeTab?.webView !== webView) return@setDownloadListener
@@ -134,13 +138,14 @@ internal fun MainActivity.installServiceWorkerMediaCapture() {
     ) return
     ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(object : ServiceWorkerClientCompat() {
         override fun shouldInterceptRequest(request: android.webkit.WebResourceRequest): android.webkit.WebResourceResponse? {
-            if (prefs.getBoolean(MEDIA_CAPTURE_ENABLED_PREF, true)) {
-                val tabId = tabManager.activeTab?.id
-                if (tabId != null) {
-                    MediaCaptureDetector.onRequestObserved(tabId, MediaCaptureStore.pageUrlFor(tabId), request)
-                }
+            val tabId = runCatching { tabManager.activeTab?.id }.getOrNull()
+            val pageUrl = tabId?.let { MediaCaptureStore.pageUrlFor(it) }
+            if (prefs.getBoolean(MEDIA_CAPTURE_ENABLED_PREF, true) && tabId != null) {
+                MediaCaptureDetector.onRequestObserved(tabId, pageUrl, request)
             }
-            return null
+            return QuiverGuardWebIntegration.shouldInterceptServiceWorkerRequest(
+                applicationContext, request, pageUrl, tabId
+            )
         }
     })
 }

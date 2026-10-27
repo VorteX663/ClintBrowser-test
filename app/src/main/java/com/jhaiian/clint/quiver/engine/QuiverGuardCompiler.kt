@@ -4,11 +4,14 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
-data class FilterListCompileInput(val id: Long, val name: String, val rulesFile: File)
+data class FilterListCompileInput(val id: Long, val name: String, val rulesFile: File, val trusted: Boolean = false)
 
 data class CompileStatistics(val ruleLines: Long, val commentLines: Long, val emptyLines: Long)
 
@@ -43,73 +46,88 @@ sealed class CompileEvent {
 
 object QuiverGuardCompiler {
 
+    private val compileMutex = Mutex()
+
     fun compile(
         inputs: List<FilterListCompileInput>,
         outputFile: File,
         tempFile: File,
     ): Flow<CompileEvent> = flow {
+        compileMutex.withLock { compileLocked(inputs, outputFile, tempFile) }
+    }.flowOn(Dispatchers.IO)
+
+    private suspend fun FlowCollector<CompileEvent>.compileLocked(
+        inputs: List<FilterListCompileInput>,
+        outputFile: File,
+        tempFile: File,
+    ) {
         val startedAt = System.currentTimeMillis()
         emit(CompileEvent.Progress(CompileProgress(0, inputs.size, CompileStage.PREPARING, null, 0L)))
 
         val builder = QuiverGuardNative.nativeNewFilterSetBuilder()
         if (builder == 0L) {
             emit(CompileEvent.Completed(CompileResult.Failure("Could not start the native filter compiler.", null)))
-            return@flow
+            return
         }
 
         var totalRuleLines = 0L
         var totalCommentLines = 0L
         var totalEmptyLines = 0L
+        var builderOwned = true
 
-        for ((index, input) in inputs.withIndex()) {
-            emit(CompileEvent.Progress(CompileProgress(index, inputs.size, CompileStage.READING, input.name, totalRuleLines)))
-            val rules = try {
-                input.rulesFile.readText()
-            } catch (e: IOException) {
-                QuiverGuardNative.nativeDestroyFilterSetBuilder(builder)
-                emit(CompileEvent.Completed(CompileResult.Failure(e.message ?: "Failed to read filter list.", input.name, e)))
-                return@flow
+        try {
+            for ((index, input) in inputs.withIndex()) {
+                emit(CompileEvent.Progress(CompileProgress(index, inputs.size, CompileStage.READING, input.name, totalRuleLines)))
+                val rules = try {
+                    input.rulesFile.readText()
+                } catch (e: IOException) {
+                    emit(CompileEvent.Completed(CompileResult.Failure(e.message ?: "Failed to read filter list.", input.name, e)))
+                    return
+                }
+
+                emit(CompileEvent.Progress(CompileProgress(index, inputs.size, CompileStage.PARSING, input.name, totalRuleLines)))
+                val stats = JSONObject(QuiverGuardNative.nativeAddFilterListRules(builder, rules, input.trusted))
+                totalRuleLines += stats.optLong("ruleLines", 0L)
+                totalCommentLines += stats.optLong("commentLines", 0L)
+                totalEmptyLines += stats.optLong("emptyLines", 0L)
+
+                emit(CompileEvent.Progress(CompileProgress(index + 1, inputs.size, CompileStage.PARSING, input.name, totalRuleLines)))
             }
 
-            emit(CompileEvent.Progress(CompileProgress(index, inputs.size, CompileStage.PARSING, input.name, totalRuleLines)))
-            val stats = JSONObject(QuiverGuardNative.nativeAddFilterListRules(builder, rules))
-            totalRuleLines += stats.optLong("ruleLines", 0L)
-            totalCommentLines += stats.optLong("commentLines", 0L)
-            totalEmptyLines += stats.optLong("emptyLines", 0L)
+            emit(CompileEvent.Progress(CompileProgress(inputs.size, inputs.size, CompileStage.FINALIZING, null, totalRuleLines)))
 
-            emit(CompileEvent.Progress(CompileProgress(index + 1, inputs.size, CompileStage.PARSING, input.name, totalRuleLines)))
-        }
+            if (tempFile.exists()) tempFile.delete()
+            builderOwned = false
+            val finalizeResult = JSONObject(QuiverGuardNative.nativeFinalizeEngine(builder, tempFile.absolutePath))
+            val durationMs = System.currentTimeMillis() - startedAt
 
-        emit(CompileEvent.Progress(CompileProgress(inputs.size, inputs.size, CompileStage.FINALIZING, null, totalRuleLines)))
+            if (!finalizeResult.optBoolean("success", false)) {
+                tempFile.delete()
+                emit(
+                    CompileEvent.Completed(
+                        CompileResult.Failure(finalizeResult.optString("error", "Unknown native compiler error."), null)
+                    )
+                )
+                return
+            }
 
-        if (tempFile.exists()) tempFile.delete()
-        val finalizeResult = JSONObject(QuiverGuardNative.nativeFinalizeEngine(builder, tempFile.absolutePath))
-        val durationMs = System.currentTimeMillis() - startedAt
+            outputFile.delete()
+            if (!tempFile.renameTo(outputFile)) {
+                emit(CompileEvent.Completed(CompileResult.Failure("Could not finalize the compiled filter database.", null)))
+                return
+            }
 
-        if (!finalizeResult.optBoolean("success", false)) {
-            tempFile.delete()
             emit(
                 CompileEvent.Completed(
-                    CompileResult.Failure(finalizeResult.optString("error", "Unknown native compiler error."), null)
+                    CompileResult.Success(
+                        statistics = CompileStatistics(totalRuleLines, totalCommentLines, totalEmptyLines),
+                        outputFileSizeBytes = finalizeResult.optLong("sizeBytes", outputFile.length()),
+                        durationMs = durationMs,
+                    )
                 )
             )
-            return@flow
+        } finally {
+            if (builderOwned) QuiverGuardNative.nativeDestroyFilterSetBuilder(builder)
         }
-
-        outputFile.delete()
-        if (!tempFile.renameTo(outputFile)) {
-            emit(CompileEvent.Completed(CompileResult.Failure("Could not finalize the compiled filter database.", null)))
-            return@flow
-        }
-
-        emit(
-            CompileEvent.Completed(
-                CompileResult.Success(
-                    statistics = CompileStatistics(totalRuleLines, totalCommentLines, totalEmptyLines),
-                    outputFileSizeBytes = finalizeResult.optLong("sizeBytes", outputFile.length()),
-                    durationMs = durationMs,
-                )
-            )
-        )
-    }.flowOn(Dispatchers.IO)
+    }
 }

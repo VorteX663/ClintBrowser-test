@@ -186,6 +186,23 @@ internal fun MainScreen(activity: MainActivity, state: MainUiState) {
             )
         }
 
+        com.jhaiian.clint.translation.TranslateBar(
+            request = state.translateBarRequest,
+            visible = !state.isFullscreen && !state.searchOverlayOpen && !tabSwitcherOpen,
+            activeTabId = state.activeTabId,
+            onTranslate = { view, from, to -> activity.translatePage(view, from, to) },
+            onRestore = { view -> activity.restoreTranslatedPage(view) },
+            onOpenSettings = { activity.openTranslationSettings() },
+            onDismiss = { state.translateBarRequest = null },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(
+                    top = with(density) { state.contentPaddingTopPx.toDp() } + 8.dp,
+                    start = 12.dp,
+                    end = 12.dp
+                )
+        )
+
         AnimatedVisibility(
             visible = state.searchOverlayOpen,
             enter = fadeIn(tween(200)) + expandVertically(
@@ -282,6 +299,18 @@ internal fun MainScreen(activity: MainActivity, state: MainUiState) {
                 com.jhaiian.clint.browser.dialogs.PopupAlertDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.popupAlertRequest = null }
             }
         }
+        state.siteInfoRequest?.let { req ->
+            com.jhaiian.clint.browser.siteinfo.SiteInfoSheet(
+                request = req,
+                hideStatusBar = hideStatusBarPref,
+                hideSystemNavigation = hideSystemNavigationPref,
+                onPermissionChange = { type, newState -> activity.changeSiteInfoPermission(req.host, type, newState) },
+                onResetPermissions = { activity.resetSiteInfoPermissions(req.host) },
+                onCookiesClick = { activity.openSiteInfoCookies() },
+                onSiteSettingsClick = { activity.openSiteInfoSiteSettings() },
+                onDismiss = { state.siteInfoRequest = null }
+            )
+        }
         state.cookiesControlRequest?.let { req ->
             com.jhaiian.clint.browser.dialogs.CookiesControlDialog(req, hideStatusBarPref, hideSystemNavigationPref) { state.cookiesControlRequest = null }
         }
@@ -348,6 +377,15 @@ internal fun MainScreen(activity: MainActivity, state: MainUiState) {
                 onReturnToPrevious = { activity.dismissWebsiteBlockedOverlay() }
             )
         }
+        state.quiverGuardBlockedRequest?.let { req ->
+            com.jhaiian.clint.quiver.QuiverGuardBlockedOverlay(
+                request = req,
+                statusBarPaddingPx = effectiveStatusBarPx,
+                navBarPaddingPx = effectiveNavBarPx,
+                onGoBack = { activity.dismissQuiverGuardBlockedOverlay() },
+                onProceed = { activity.proceedQuiverGuardBlockedDocument() }
+            )
+        }
 
         if (!state.isFullscreen && effectiveStatusBarPx > 0) {
             Box(
@@ -407,6 +445,7 @@ private fun TopToolbar(
             showHomeButton = state.showHomeButton,
             onHomeClick = { activity.navGoHome() },
             onSwipeTabChange = { direction -> activity.onSwipeTabChange(direction) },
+            onSiteInfoClick = { if (!activity.openSiteInfo()) activity.openSearchOverlay(isBottom = false) },
             openTabsSwipeDirection = 1
         )
         if (showTabGroupBar) TabGroupBarSlot(activity, state, onOpenTabGroup)
@@ -606,6 +645,7 @@ private fun BottomToolbar(
             showHomeButton = state.showHomeButton,
             onHomeClick = { activity.navGoHome() },
             onSwipeTabChange = { direction -> activity.onSwipeTabChange(direction) },
+            onSiteInfoClick = { if (!activity.openSiteInfo()) activity.openSearchOverlay(isBottom = true) },
             openTabsSwipeDirection = -1
         )
     }

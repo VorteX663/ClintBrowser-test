@@ -3,6 +3,8 @@ import androidx.compose.ui.graphics.toArgb
 import com.jhaiian.clint.browser.home.isClintHomeUrl
 import com.jhaiian.clint.ui.theme.ThemeMode
 import com.jhaiian.clint.browser.*
+import com.jhaiian.clint.browser.suggestions.PREF_SUGGESTIONS_SHOW_BOOKMARKS
+import com.jhaiian.clint.browser.suggestions.PREF_SUGGESTIONS_SHOW_HISTORY
 import com.jhaiian.clint.browser.suggestions.SuggestionFetcher
 import com.jhaiian.clint.settings.datasaver.DataSaverMode
 import com.jhaiian.clint.browser.webview.loadJsAsset
@@ -89,12 +91,13 @@ internal fun MainActivity.onSearchQueryChanged(query: String) {
     bgHandler.post {
         val isIncognito = tabManager.activeTab?.isIncognito == true
         val incognitoHistoryAllowed = prefs.getBoolean("incognito_search_history_enabled", false)
-        val historyAllowed = !isIncognito || incognitoHistoryAllowed
+        val historyAllowed = prefs.getBoolean(PREF_SUGGESTIONS_SHOW_HISTORY, true) && (!isIncognito || incognitoHistoryAllowed)
+        val bookmarksAllowed = prefs.getBoolean(PREF_SUGGESTIONS_SHOW_BOOKMARKS, true)
         if (query.isBlank()) {
             suggestionFetcher?.cancel()
             lastOnlineSuggestions = emptyList()
             val history = if (historyAllowed) SearchHistoryManager.getAll(this).take(SUGGESTION_HISTORY_LIMIT) else emptyList()
-            val bookmarks = BookmarkManager.getAll(this).take(SUGGESTION_BOOKMARK_LIMIT)
+            val bookmarks = if (bookmarksAllowed) BookmarkManager.getAll(this).take(SUGGESTION_BOOKMARK_LIMIT) else emptyList()
             runOnUiThread { uiState.suggestions = combineSuggestions(bookmarks, history, emptyList()) }
             return@post
         }
@@ -105,7 +108,7 @@ internal fun MainActivity.onSearchQueryChanged(query: String) {
             lastOnlineSuggestions = emptyList()
         }
         val history = if (historyAllowed) SearchHistoryManager.search(this, query).take(SUGGESTION_HISTORY_LIMIT) else emptyList()
-        val bookmarks = BookmarkManager.search(this, query).take(SUGGESTION_BOOKMARK_LIMIT)
+        val bookmarks = if (bookmarksAllowed) BookmarkManager.search(this, query).take(SUGGESTION_BOOKMARK_LIMIT) else emptyList()
         runOnUiThread { uiState.suggestions = combineSuggestions(bookmarks, history, lastOnlineSuggestions) }
         if (onlineBlocked) return@post
         val customSuggestionsUrl = if (suggestionsApi == "custom") {
@@ -122,10 +125,7 @@ internal fun MainActivity.onSuggestionHistoryDelete(query: String) {
     val bgHandler = suggestionsBgHandler ?: return
     bgHandler.post {
         SearchHistoryManager.delete(this, query)
-        val currentQuery = uiState.searchQuery
-        val history = SearchHistoryManager.search(this, currentQuery).take(SUGGESTION_HISTORY_LIMIT)
-        val bookmarks = BookmarkManager.search(this, currentQuery).take(SUGGESTION_BOOKMARK_LIMIT)
-        runOnUiThread { uiState.suggestions = combineSuggestions(bookmarks, history, emptyList()) }
+        runOnUiThread { if (uiState.searchOverlayOpen) onSearchQueryChanged(uiState.searchQuery) }
     }
 }
 
@@ -351,6 +351,7 @@ internal fun MainActivity.updateNavigationState() {
 internal fun MainActivity.updateTabCount() {
     val count = tabManager.previews().size
     uiState.tabCountText = if (count > 99) ":D" else count.toString()
+    com.jhaiian.clint.privacy.BrowsingDataCleaner.openTabCount = count
     refreshTabGroupBar()
     refreshTabStrip()
 }

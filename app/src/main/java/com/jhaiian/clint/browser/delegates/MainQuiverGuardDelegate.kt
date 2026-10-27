@@ -5,11 +5,10 @@ import androidx.lifecycle.lifecycleScope
 import com.jhaiian.clint.R
 import com.jhaiian.clint.browser.MainActivity
 import com.jhaiian.clint.quiver.QuiverGuardActivity
+import com.jhaiian.clint.quiver.QuiverGuardBlockedRequest
 import com.jhaiian.clint.quiver.engine.BlockedRequestCounter
 import com.jhaiian.clint.quiver.engine.QuiverGuardEngine
 import com.jhaiian.clint.quiver.engine.QuiverGuardWebIntegration
-import com.jhaiian.clint.settings.sitepermissions.SitePermissionDatabase
-import com.jhaiian.clint.settings.sitepermissions.SitePermissionManager
 import com.jhaiian.clint.tabs.BrowserTab
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,73 +54,43 @@ internal fun MainActivity.showQuiverGuardRecompileRequiredDialog(reason: QuiverG
 }
 
 internal fun MainActivity.onQuiverGuardPageStarted(tab: BrowserTab, url: String) {
-    val isEnabled = prefs.getBoolean("quiver_guard_enabled", false)
-    if (!isEnabled) return
     if (!url.startsWith("http://") && !url.startsWith("https://")) return
-
-    quiverGuardJobs.remove(tab.id)?.cancel()
-    quiverGuardJobs[tab.id] = lifecycleScope.launch {
-        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()
-
-        val isExcepted = withContext(Dispatchers.IO) {
-            host != null && SitePermissionManager.getState(
-                this@onQuiverGuardPageStarted, host, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION
-            ) != null
-        }
-
-        BlockedRequestCounter.resetTab(tab.id)
-
-        if (isExcepted) {
-
-            quiverGuardScriptHandlers.remove(tab.id)
-            return@launch
-        }
-
-        val script = withContext(Dispatchers.IO) {
-            QuiverGuardWebIntegration.buildDocumentStartScript(this@onQuiverGuardPageStarted, url, true)
-        }
-
-        if (script != null) {
-            QuiverGuardWebIntegration.applyDocumentStartScript(
-                tab.webView, quiverGuardScriptHandlers, tab.id, script
-            )
-            QuiverGuardWebIntegration.applyCosmeticFilterScript(tab.webView, script)
-        }
-    }
+    BlockedRequestCounter.resetTab(tab.id)
+    applyQuiverGuardFallbackScripts(tab, url)
 }
 
 internal fun MainActivity.onQuiverGuardPageFinished(tab: BrowserTab, url: String) {
-    val isEnabled = prefs.getBoolean("quiver_guard_enabled", false)
-    if (!isEnabled) return
     if (!url.startsWith("http://") && !url.startsWith("https://")) return
+    applyQuiverGuardFallbackScripts(tab, url)
+}
+
+private fun MainActivity.applyQuiverGuardFallbackScripts(tab: BrowserTab, url: String) {
+    if (QuiverGuardWebIntegration.supportsDocumentStart) return
+    if (!prefs.getBoolean(QuiverGuardWebIntegration.PREF_ENABLED, false)) return
 
     quiverGuardJobs.remove(tab.id)?.cancel()
     quiverGuardJobs[tab.id] = lifecycleScope.launch {
-        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()
-        val isExcepted = withContext(Dispatchers.IO) {
-            host != null && SitePermissionManager.getState(
-                this@onQuiverGuardPageFinished, host, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION
-            ) != null
+        val scripts = withContext(Dispatchers.IO) {
+            if (!QuiverGuardWebIntegration.isActiveFor(this@applyQuiverGuardFallbackScripts, url)) {
+                emptyList()
+            } else {
+                listOfNotNull(
+                    QuiverGuardWebIntegration.fallbackBootstrapScript(this@applyQuiverGuardFallbackScripts),
+                    QuiverGuardWebIntegration.fallbackScriptletScript(url)
+                )
+            }
         }
-        if (isExcepted) return@launch
-
-        val script = withContext(Dispatchers.IO) {
-            QuiverGuardWebIntegration.buildCosmeticFilterScript(this@onQuiverGuardPageFinished, url, true)
-        } ?: return@launch
-
-        QuiverGuardWebIntegration.applyCosmeticFilterScript(tab.webView, script)
+        scripts.forEach { tab.webView.evaluateJavascript(it, null) }
     }
 }
 
 internal fun MainActivity.onQuiverGuardTabClosed(tab: BrowserTab) {
     quiverGuardJobs.remove(tab.id)?.cancel()
-    quiverGuardScriptHandlers.remove(tab.id)
     BlockedRequestCounter.removeTab(tab.id)
 }
 
 internal fun MainActivity.onQuiverGuardEnabled(enabled: Boolean) {
     if (!enabled) {
-        quiverGuardScriptHandlers.clear()
         reloadActiveTabIfWeb()
         return
     }
@@ -134,6 +103,31 @@ internal fun MainActivity.onQuiverGuardEnabled(enabled: Boolean) {
             showQuiverGuardRecompileRequiredDialog(result)
         }
     }
+}
+
+internal fun MainActivity.onQuiverGuardDocumentBlocked(blockedUrl: String, tabId: String) {
+    if (tabManager.activeTab?.id != tabId) return
+    uiState.quiverGuardBlockedRequest = QuiverGuardBlockedRequest(blockedUrl = blockedUrl, tabId = tabId)
+}
+
+internal fun MainActivity.dismissQuiverGuardBlockedOverlay() {
+    val request = uiState.quiverGuardBlockedRequest ?: return
+    uiState.quiverGuardBlockedRequest = null
+    val tab = tabManager.tabs.find { it.id == request.tabId } ?: return
+    if (tab.webView.canGoBack()) {
+        tab.webView.goBack()
+    } else {
+        tab.webView.loadUrl(getHomepageUrl())
+    }
+}
+
+internal fun MainActivity.proceedQuiverGuardBlockedDocument() {
+    val request = uiState.quiverGuardBlockedRequest ?: return
+    uiState.quiverGuardBlockedRequest = null
+    val tab = tabManager.tabs.find { it.id == request.tabId } ?: return
+    QuiverGuardWebIntegration.allowBlockedDocument(request.blockedUrl)
+    val headers = buildRequestHeaders(request.blockedUrl)
+    if (headers != null) tab.webView.loadUrl(request.blockedUrl, headers) else tab.webView.loadUrl(request.blockedUrl)
 }
 
 private fun MainActivity.reloadActiveTabIfWeb() {

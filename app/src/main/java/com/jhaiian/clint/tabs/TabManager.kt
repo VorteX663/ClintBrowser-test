@@ -90,7 +90,7 @@ class TabManager {
     }
 
     fun previews(): List<TabPreview> = tabs.filter { !isGhostTab(it) }.map {
-        TabPreview(it.id, it.title.ifBlank { "New Tab" }, if (com.jhaiian.clint.browser.home.isClintHomeUrl(it.url)) "" else it.url, it.isIncognito, it.profileId, it.groupId)
+        TabPreview(it.id, it.title.ifBlank { "New Tab" }, if (com.jhaiian.clint.browser.home.isClintHomeUrl(it.url)) "" else it.url, it.isIncognito, it.profileId, (it.webView as? com.jhaiian.clint.browser.webview.ClintWebView)?.audioState, it.groupId)
     }
 
     fun moveTab(fromIndex: Int, toIndex: Int) {

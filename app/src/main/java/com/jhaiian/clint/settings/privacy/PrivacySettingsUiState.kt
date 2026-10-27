@@ -16,6 +16,7 @@ class PrivacySettingsUiState(
     initialClearHistory: Boolean,
     initialClearCookies: Boolean,
     initialClearCache: Boolean,
+    initialClearTabs: Boolean,
     initialAppLock: Boolean,
     initialAppLockTimeout: Int,
     initialScreenshotBlocking: Boolean,
@@ -38,6 +39,7 @@ class PrivacySettingsUiState(
     var clearHistory by mutableStateOf(initialClearHistory)
     var clearCookies by mutableStateOf(initialClearCookies)
     var clearCache by mutableStateOf(initialClearCache)
+    var clearTabs by mutableStateOf(initialClearTabs)
     var appLock by mutableStateOf(initialAppLock)
     var appLockTimeout by mutableStateOf(initialAppLockTimeout)
     var screenshotBlocking by mutableStateOf(initialScreenshotBlocking)

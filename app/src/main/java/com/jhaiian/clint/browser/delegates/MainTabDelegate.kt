@@ -6,6 +6,7 @@ import com.jhaiian.clint.tabs.BrowserTab
 import com.jhaiian.clint.profiles.WebProfiles
 import com.jhaiian.clint.tabs.InactiveTabsPolicy
 import com.jhaiian.clint.tabs.SavedTab
+import com.jhaiian.clint.tabs.TabGroupPrefs
 import com.jhaiian.clint.tabs.TabSessionManager
 import com.jhaiian.clint.tabs.TabThumbnailCache
 import com.jhaiian.clint.browser.webview.ClintAutofill
@@ -13,7 +14,6 @@ import com.jhaiian.clint.browser.webview.ClintWebChromeClient
 import com.jhaiian.clint.browser.webview.ClintWebViewClient
 import com.jhaiian.clint.quiver.engine.BlockedRequestCounter
 import com.jhaiian.clint.quiver.engine.QuiverGuardWebIntegration
-import com.jhaiian.clint.quiver.engine.ScriptHandlerStore
 
 internal fun MainActivity.saveTabs() {
     tabManager.touchActive()
@@ -47,17 +47,25 @@ internal fun MainActivity.saveTabs() {
     persistAllShortcutTabGroups()
 }
 
+internal fun MainActivity.discardSavedTabs() {
+    TabSessionManager.clear(this)
+    TabThumbnailCache.pruneDisk(this, emptySet())
+}
+
 internal fun MainActivity.restoreTabs(): Boolean {
     migrateTabsFromPrefsIfNeeded()
     val savedTabs = TabSessionManager.load(this).filter { it.shortcutId == null }
     if (savedTabs.isEmpty()) return false
     val activeIndex = savedTabs.indexOfFirst { it.isActive }.coerceAtLeast(0)
+    val groupsEnabled = TabGroupPrefs.isEnabled(prefs)
     val referencedGroupIds = savedTabs.mapNotNull { it.groupId }.toSet()
-    TabSessionManager.loadGroups(this)
-        .filter { it.id in referencedGroupIds }
-        .forEach { tabManager.restoreGroup(it) }
+    if (groupsEnabled) {
+        TabSessionManager.loadGroups(this)
+            .filter { it.id in referencedGroupIds }
+            .forEach { tabManager.restoreGroup(it) }
+    }
     savedTabs.forEachIndexed { index, saved ->
-        openNewTabSilent(saved.url, saved.tabId, saved.shortcutId, deferLoad = index != activeIndex, title = saved.title, profileId = saved.profileId, groupId = saved.groupId)
+        openNewTabSilent(saved.url, saved.tabId, saved.shortcutId, deferLoad = index != activeIndex, title = saved.title, profileId = saved.profileId, groupId = saved.groupId.takeIf { groupsEnabled })
     }
     tabManager.pruneEmptyGroups()
     val activeTabId = savedTabs[activeIndex].tabId
@@ -149,6 +157,7 @@ internal fun MainActivity.openNewTabSilent(
     addDoNotTrackScript(tab)
     addDataSaverMediaScript(tab)
     addUserScripts(tab)
+    addBackgroundPlaybackScript(tab)
     webView.webViewClient = ClintWebViewClient(
         prefs = prefs,
         isActive = { tabManager.activeTab?.id == tab.id },
@@ -156,6 +165,7 @@ internal fun MainActivity.openNewTabSilent(
         onPageFinishedCallback = { url -> if (tabManager.activeTab?.id == tab.id) onPageFinished(url) },
         onTabUrlUpdatedCallback = { wv, url -> onTabUrlUpdated(wv, url) },
         onWebsiteBlockedCallback = { blockedUrl -> onWebsiteBlocked(blockedUrl, tab.url, tab.id) },
+        onQuiverGuardDocumentBlocked = { blockedUrl -> onQuiverGuardDocumentBlocked(blockedUrl, tab.id) },
         getDesktopHeaders = { buildRequestHeaders() },
         getTabId = { tab.id },
         isIncognito = { tab.isIncognito },
@@ -204,6 +214,7 @@ internal fun MainActivity.openNewTabInBackground(url: String, openerTabId: Strin
     addDoNotTrackScript(tab)
     addDataSaverMediaScript(tab)
     addUserScripts(tab)
+    addBackgroundPlaybackScript(tab)
     webView.webViewClient = ClintWebViewClient(
         prefs = prefs,
         isActive = { tabManager.activeTab?.id == tab.id },
@@ -211,6 +222,7 @@ internal fun MainActivity.openNewTabInBackground(url: String, openerTabId: Strin
         onPageFinishedCallback = { url -> if (tabManager.activeTab?.id == tab.id) onPageFinished(url) },
         onTabUrlUpdatedCallback = { wv, url -> onTabUrlUpdated(wv, url) },
         onWebsiteBlockedCallback = { blockedUrl -> onWebsiteBlocked(blockedUrl, tab.url, tab.id) },
+        onQuiverGuardDocumentBlocked = { blockedUrl -> onQuiverGuardDocumentBlocked(blockedUrl, tab.id) },
         getDesktopHeaders = { buildRequestHeaders() },
         getTabId = { tab.id },
         isIncognito = { tab.isIncognito },
@@ -272,6 +284,7 @@ internal fun MainActivity.openNewTab(isIncognito: Boolean, url: String = getHome
     addDoNotTrackScript(tab)
     addDataSaverMediaScript(tab)
     addUserScripts(tab)
+    addBackgroundPlaybackScript(tab)
     webView.webViewClient = ClintWebViewClient(
         prefs = prefs,
         isActive = { tabManager.activeTab?.id == tab.id },
@@ -279,6 +292,7 @@ internal fun MainActivity.openNewTab(isIncognito: Boolean, url: String = getHome
         onPageFinishedCallback = { url -> if (tabManager.activeTab?.id == tab.id) onPageFinished(url) },
         onTabUrlUpdatedCallback = { wv, url -> onTabUrlUpdated(wv, url) },
         onWebsiteBlockedCallback = { blockedUrl -> onWebsiteBlocked(blockedUrl, tab.url, tab.id) },
+        onQuiverGuardDocumentBlocked = { blockedUrl -> onQuiverGuardDocumentBlocked(blockedUrl, tab.id) },
         getDesktopHeaders = { buildRequestHeaders() },
         getTabId = { tab.id },
         isIncognito = { tab.isIncognito },
@@ -330,12 +344,14 @@ internal fun MainActivity.attachActiveWebView() {
     val tab = tabManager.activeTab ?: return
     tab.lastActiveAt = System.currentTimeMillis()
     ClintAutofill.cancel(this)
-    webContainer.removeAllViews()
-    (tab.webView.parent as? android.view.ViewGroup)?.removeView(tab.webView)
-    webContainer.addView(tab.webView, android.view.ViewGroup.LayoutParams(
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-    ))
+    if (tab.webView.parent !== webContainer) {
+        (tab.webView.parent as? android.view.ViewGroup)?.removeView(tab.webView)
+        webContainer.addView(tab.webView, android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+    }
+    syncParkedMediaViews()
     autoDesktopPendingReload = null
     syncDesktopModeForUrl(tab.pendingUrl ?: tab.webView.url ?: tab.url)
     tab.pendingUrl?.let { pending ->
@@ -374,7 +390,7 @@ internal fun MainActivity.syncTabPlayback() {
     tabManager.tabs.forEach { tab ->
         if (tab.id == activeId) {
             tab.webView.onResume()
-        } else if (tab.pendingUrl == null) {
+        } else if (tab.pendingUrl == null && !backgroundPlaybackTracker.isPlaying(tab.id)) {
             tab.webView.evaluateJavascript(com.jhaiian.clint.browser.webview.TabMediaControl.PAUSE_SCRIPT, null)
             tab.webView.onPause()
         }
@@ -393,6 +409,7 @@ internal fun MainActivity.openRefreshLinkTab(url: String) {
     addDoNotTrackScript(tab)
     addDataSaverMediaScript(tab)
     addUserScripts(tab)
+    addBackgroundPlaybackScript(tab)
     webView.webViewClient = ClintWebViewClient(
         prefs = prefs,
         isActive = { tabManager.activeTab?.id == tab.id },
@@ -400,6 +417,7 @@ internal fun MainActivity.openRefreshLinkTab(url: String) {
         onPageFinishedCallback = { u -> if (tabManager.activeTab?.id == tab.id) onPageFinished(u) },
         onTabUrlUpdatedCallback = { wv, u -> onTabUrlUpdated(wv, u) },
         onWebsiteBlockedCallback = { blockedUrl -> onWebsiteBlocked(blockedUrl, tab.url, tab.id) },
+        onQuiverGuardDocumentBlocked = { blockedUrl -> onQuiverGuardDocumentBlocked(blockedUrl, tab.id) },
         getDesktopHeaders = { buildRequestHeaders() },
         getTabId = { tab.id },
         isIncognito = { tab.isIncognito },

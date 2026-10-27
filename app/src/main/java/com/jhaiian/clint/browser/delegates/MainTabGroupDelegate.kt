@@ -34,6 +34,17 @@ internal fun MainActivity.focusTabById(tabId: String) {
     onTabSelected(index)
 }
 
+internal fun MainActivity.applyTabGroupsSetting() {
+    if (TabGroupPrefs.isEnabled(prefs) || tabManager.groups.isEmpty()) {
+        updateTabCount()
+        return
+    }
+    tabManager.removeFromGroup(tabManager.tabs.filter { it.groupId != null }.map { it.id })
+    tabManager.groups.clear()
+    uiState.tabMenuFocusGroupId = null
+    onTabGroupsChanged()
+}
+
 internal fun MainActivity.onTabGroupsChanged() {
     updateTabCount()
     saveTabs()
@@ -89,7 +100,8 @@ private fun MainActivity.reopenClosedTabs(
     placeholderTabId: String?,
     keepActiveId: String?
 ) {
-    groups.forEach { tabManager.restoreGroup(it) }
+    val groupsEnabled = TabGroupPrefs.isEnabled(prefs)
+    if (groupsEnabled) groups.forEach { tabManager.restoreGroup(it) }
     val currentActiveId = tabManager.activeTab?.id
     val reopenedIds = snapshots.map { snapshot ->
         val id = java.util.UUID.randomUUID().toString()
@@ -99,7 +111,7 @@ private fun MainActivity.reopenClosedTabs(
             deferLoad = true,
             title = snapshot.title,
             profileId = snapshot.profileId,
-            groupId = snapshot.groupId
+            groupId = snapshot.groupId.takeIf { groupsEnabled }
         )
         id
     }

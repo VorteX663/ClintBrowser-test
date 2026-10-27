@@ -14,9 +14,11 @@ import com.jhaiian.clint.quiver.engine.QuiverGuardPaths
 import com.jhaiian.clint.quiver.engine.QuiverGuardWebIntegration
 import com.jhaiian.clint.util.formatFileSize
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 
 internal fun QuiverGuardActivity.showSetupGuideDialog() {
@@ -96,7 +98,8 @@ internal fun QuiverGuardActivity.startCompilation() {
     val inputs = enabledAndDownloaded.map { fl ->
         FilterListCompileInput(
             id = fl.id, name = fl.name,
-            rulesFile = FilterListDownloader.localFileFor(applicationContext, fl.id)
+            rulesFile = FilterListDownloader.localFileFor(applicationContext, fl.id),
+            trusted = FilterListDatabase.isTrusted(fl)
         )
     } + if (manualFilterContributes) {
 
@@ -169,7 +172,7 @@ internal fun QuiverGuardActivity.startCompilation() {
     }
 }
 
-private fun QuiverGuardActivity.onCompileSuccess(
+private suspend fun QuiverGuardActivity.onCompileSuccess(
     result: CompileResult.Success,
     compiledListCount: Int,
     effectiveLists: List<FilterList>,
@@ -233,7 +236,7 @@ private fun QuiverGuardActivity.onCompileSuccess(
     uiState.isStartupDirty = false
     uiState.bannerText = null
     refreshFilterListDisplay()
-    QuiverGuardWebIntegration.onCompileComplete(this)
+    withContext(Dispatchers.IO) { QuiverGuardWebIntegration.onCompileComplete(applicationContext) }
 
     showCompileSuccessDialog(result, compiledListCount)
 }

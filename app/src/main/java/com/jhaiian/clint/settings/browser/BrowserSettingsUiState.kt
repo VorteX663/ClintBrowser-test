@@ -19,7 +19,10 @@ class BrowserSettingsUiState(
     initialSearchSuggestionsApi: String,
     initialCustomSearchSuggestionsApiName: String,
     initialCustomSearchSuggestionsApiUrl: String,
+    initialSuggestionsShowHistory: Boolean,
+    initialSuggestionsShowBookmarks: Boolean,
     initialJavascriptEnabled: Boolean,
+    initialBackgroundPlayback: Boolean,
     initialHideStatusBar: Boolean,
     initialHideSystemNavigation: Boolean,
     initialIncognitoSearchHistory: Boolean,
@@ -44,7 +47,10 @@ class BrowserSettingsUiState(
     var searchSuggestionsApi by mutableStateOf(initialSearchSuggestionsApi)
     var customSearchSuggestionsApiName by mutableStateOf(initialCustomSearchSuggestionsApiName)
     var customSearchSuggestionsApiUrl by mutableStateOf(initialCustomSearchSuggestionsApiUrl)
+    var suggestionsShowHistory by mutableStateOf(initialSuggestionsShowHistory)
+    var suggestionsShowBookmarks by mutableStateOf(initialSuggestionsShowBookmarks)
     var javascriptEnabled by mutableStateOf(initialJavascriptEnabled)
+    var backgroundPlayback by mutableStateOf(initialBackgroundPlayback)
     var hideStatusBar by mutableStateOf(initialHideStatusBar)
     var hideSystemNavigation by mutableStateOf(initialHideSystemNavigation)
     var incognitoSearchHistory by mutableStateOf(initialIncognitoSearchHistory)

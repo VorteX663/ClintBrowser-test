@@ -27,14 +27,23 @@ internal class FilterListDatabase(context: Context) :
         )
 
         for ((name, url) in DEFAULT_FILTER_LISTS) {
-            val cv = ContentValues()
-            cv.put(COL_NAME, name)
-            cv.put(COL_DOWNLOAD_URL, url)
-            cv.put(COL_ENABLED, 0)
-            cv.put(COL_IS_CUSTOM, 0)
-            cv.put(COL_COMPILED_AT, 0)
-            db.insert(TABLE, null, cv)
+            insertBuiltInList(db, name, url)
         }
+    }
+
+    private fun insertBuiltInListIfMissing(db: SQLiteDatabase, name: String, url: String) {
+        val exists = db.query(TABLE, arrayOf(COL_ID), "$COL_DOWNLOAD_URL = ?", arrayOf(url), null, null, null).use { it.count > 0 }
+        if (!exists) insertBuiltInList(db, name, url)
+    }
+
+    private fun insertBuiltInList(db: SQLiteDatabase, name: String, url: String) {
+        val cv = ContentValues()
+        cv.put(COL_NAME, name)
+        cv.put(COL_DOWNLOAD_URL, url)
+        cv.put(COL_ENABLED, 0)
+        cv.put(COL_IS_CUSTOM, 0)
+        cv.put(COL_COMPILED_AT, 0)
+        db.insert(TABLE, null, cv)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -47,22 +56,18 @@ internal class FilterListDatabase(context: Context) :
         if (oldVersion < 4) {
 
             for ((name, url) in NEW_IN_V4_FILTER_LISTS) {
-                val exists = db.query(TABLE, arrayOf(COL_ID), "$COL_DOWNLOAD_URL = ?", arrayOf(url), null, null, null).use { it.count > 0 }
-                if (!exists) {
-                    val cv = ContentValues()
-                    cv.put(COL_NAME, name)
-                    cv.put(COL_DOWNLOAD_URL, url)
-                    cv.put(COL_ENABLED, 0)
-                    cv.put(COL_IS_CUSTOM, 0)
-                    cv.put(COL_COMPILED_AT, 0)
-                    db.insert(TABLE, null, cv)
-                }
+                insertBuiltInListIfMissing(db, name, url)
             }
         }
         if (oldVersion < 5) {
 
             db.execSQL("ALTER TABLE $TABLE ADD COLUMN $COL_ETAG TEXT DEFAULT NULL")
             db.execSQL("ALTER TABLE $TABLE ADD COLUMN $COL_LAST_MODIFIED TEXT DEFAULT NULL")
+        }
+        if (oldVersion < 6) {
+            for ((name, url) in NEW_IN_V6_FILTER_LISTS) {
+                insertBuiltInListIfMissing(db, name, url)
+            }
         }
     }
 
@@ -230,7 +235,7 @@ internal class FilterListDatabase(context: Context) :
 
     companion object {
         const val DB_NAME           = "quiver_guard.db"
-        const val DB_VERSION        = 5
+        const val DB_VERSION        = 6
         const val TABLE             = "filter_lists"
         const val COL_ID            = "id"
         const val COL_NAME          = "name"
@@ -249,6 +254,21 @@ internal class FilterListDatabase(context: Context) :
         private const val ADGUARD_MOBILE_ADS_URL = "https://filters.adtidy.org/extension/ublock/filters/11.txt"
         private const val ADGUARD_BASE_FILTER_URL = "https://filters.adtidy.org/extension/ublock/filters/2_without_easylist.txt"
         private const val ADGUARD_ANNOYANCES_URL = "https://filters.adtidy.org/extension/ublock/filters/14.txt"
+        private const val UBO_FILTERS_URL = "https://ublockorigin.github.io/uAssets/filters/filters.min.txt"
+        private const val UBO_PRIVACY_URL = "https://ublockorigin.github.io/uAssets/filters/privacy.min.txt"
+        private const val UBO_BADWARE_URL = "https://ublockorigin.github.io/uAssets/filters/badware.min.txt"
+        private const val UBO_QUICK_FIXES_URL = "https://ublockorigin.github.io/uAssets/filters/quick-fixes.min.txt"
+        private const val UBO_UNBREAK_URL = "https://ublockorigin.github.io/uAssets/filters/unbreak.min.txt"
+        private const val PETER_LOWE_URL = "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext"
+
+        private val NEW_IN_V6_FILTER_LISTS = listOf(
+            Pair("uBlock filters", UBO_FILTERS_URL),
+            Pair("uBlock filters – Privacy", UBO_PRIVACY_URL),
+            Pair("uBlock filters – Badware risks", UBO_BADWARE_URL),
+            Pair("uBlock filters – Quick fixes", UBO_QUICK_FIXES_URL),
+            Pair("uBlock filters – Unbreak", UBO_UNBREAK_URL),
+            Pair("Peter Lowe's Ad and tracking server list", PETER_LOWE_URL)
+        )
 
         private val DEFAULT_FILTER_LISTS = listOf(
             Pair("EasyList", "https://easylist.to/easylist/easylist.txt"),
@@ -257,11 +277,18 @@ internal class FilterListDatabase(context: Context) :
             Pair("AdGuard Mobile Ads", ADGUARD_MOBILE_ADS_URL),
             Pair("AdGuard Base Filter", ADGUARD_BASE_FILTER_URL),
             Pair("AdGuard Annoyances", ADGUARD_ANNOYANCES_URL)
-        )
+        ) + NEW_IN_V6_FILTER_LISTS
 
         private val NEW_IN_V4_FILTER_LISTS = listOf(
             Pair("AdGuard Base Filter", ADGUARD_BASE_FILTER_URL),
             Pair("AdGuard Annoyances", ADGUARD_ANNOYANCES_URL)
         )
+
+        private val TRUSTED_FILTER_LIST_URLS = setOf(
+            UBO_FILTERS_URL, UBO_PRIVACY_URL, UBO_BADWARE_URL, UBO_QUICK_FIXES_URL, UBO_UNBREAK_URL
+        )
+
+        fun isTrusted(filterList: FilterList): Boolean =
+            !filterList.isCustom && filterList.downloadUrl in TRUSTED_FILTER_LIST_URLS
     }
 }

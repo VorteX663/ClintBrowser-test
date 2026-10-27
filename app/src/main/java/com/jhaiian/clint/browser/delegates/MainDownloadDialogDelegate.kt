@@ -15,7 +15,6 @@ import com.jhaiian.clint.downloads.DownloadRequestSubmission
 import com.jhaiian.clint.downloads.checkFat32FileSizeLimit
 import com.jhaiian.clint.downloads.checkStorageAvailable
 import com.jhaiian.clint.downloads.resolveSpeedLimitBytesPerSec
-import com.jhaiian.clint.downloads.estimateBase64DecodedSize
 import com.jhaiian.clint.downloads.ClintDownloadManager
 import com.jhaiian.clint.downloads.DownloadsActivity
 import com.jhaiian.clint.settings.downloads.DownloadSettingsKeys
@@ -69,7 +68,7 @@ internal fun MainActivity.showDownloadDialog(
 }
 
 internal fun MainActivity.showDownloadDialogForBlob(
-    base64: String,
+    blob: java.io.File,
     filename: String,
     mimeType: String,
     forceQuick: Boolean = false
@@ -80,8 +79,7 @@ internal fun MainActivity.showDownloadDialogForBlob(
         url = blobLabel,
         onCopyLink = { copyDownloadRequestLink(blobLabel) },
         initialFilename = filename,
-        contentLengthBytes = estimateBase64DecodedSize(base64),
-        fileSizeDisplayOverride = getString(R.string.download_dialog_file_size_unknown),
+        contentLengthBytes = blob.length(),
         checkStorage = false,
         showOptions = false,
         showStorageInfo = true,
@@ -101,9 +99,23 @@ internal fun MainActivity.showDownloadDialogForBlob(
                 )
             }
             dismiss()
-            ClintDownloadManager.enqueueBlob(this, base64, submission.filename, mimeType)
+            ClintDownloadManager.enqueueBlob(this, blob, submission.filename, mimeType)
         }
     )
+}
+
+internal fun MainActivity.downloadBase64Blob(base64: String, filename: String, mimeType: String, forceQuick: Boolean = false) {
+    val appContext = applicationContext
+    Thread {
+        val blob = com.jhaiian.clint.downloads.DownloadBlobStore.fromBase64(appContext, base64)
+        runOnUiThread {
+            when {
+                blob == null -> Toast.makeText(appContext, R.string.download_response_failed, Toast.LENGTH_SHORT).show()
+                isFinishing || isDestroyed -> ClintDownloadManager.enqueueBlob(appContext, blob, filename, mimeType)
+                else -> showDownloadDialogForBlob(blob, filename, mimeType, forceQuick)
+            }
+        }
+    }.start()
 }
 
 internal fun MainActivity.showDownloadStartedSnackbar(filename: String, locationMode: String, customLocationUri: String?) {

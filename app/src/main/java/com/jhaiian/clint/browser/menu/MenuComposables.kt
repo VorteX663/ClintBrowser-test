@@ -1,5 +1,6 @@
 package com.jhaiian.clint.browser.menu
 import android.content.res.Configuration
+import android.net.Uri
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Bookmark
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -91,12 +93,23 @@ import com.jhaiian.clint.userscripts.UserScriptState
 import com.jhaiian.clint.ui.ClintDialogStatusBarEffect
 import com.jhaiian.clint.ui.listscreen.PopupShape
 import com.jhaiian.clint.ui.theme.LocalClintColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+internal data class BrowserMenuPageState(
+    val isBookmarked: Boolean,
+    val isDataSaverExceptionForSite: Boolean,
+    val isQuiverGuardExceptionForSite: Boolean,
+    val openInAppEnabled: Boolean,
+    val openInAppLabel: String?
+)
 
 internal data class BrowserMenuSnapshot(
+    val url: String,
     val showNavRow: Boolean,
     val canGoBack: Boolean,
     val canGoForward: Boolean,
-    val isBookmarked: Boolean,
+    val page: BrowserMenuPageState,
     val isLoading: Boolean,
     val isDesktopMode: Boolean,
     val isDataSaverEnabled: Boolean,
@@ -106,13 +119,13 @@ internal data class BrowserMenuSnapshot(
     val isUserScriptsEnabled: Boolean,
     val isQuiverGuardEnabled: Boolean,
     val quiverGuardBlockedCount: Long,
-    val isQuiverGuardExceptionForSite: Boolean,
-    val isDataSaverExceptionForSite: Boolean,
     val isWebsiteBlockerEnabled: Boolean,
-    val openInAppEnabled: Boolean,
-    val openInAppLabel: String?,
     val canCreateShortcut: Boolean,
     val canUseCookiesControl: Boolean,
+    val canTranslatePage: Boolean,
+    val isPageTranslated: Boolean,
+    val canToggleTabMute: Boolean,
+    val isTabMuted: Boolean,
     val visibleMenuItems: List<CustomizableMenuItem>
 )
 
@@ -151,39 +164,31 @@ internal class BrowserMenuActions(
     val onDisableDataSaverForSite: () -> Unit,
     val onWebsiteBlocker: () -> Unit,
     val onOpenWebsiteBlockerSettings: () -> Unit,
-    val onCookiesControl: () -> Unit
+    val onToggleTabMute: () -> Unit,
+    val onCookiesControl: () -> Unit,
+    val onTranslate: () -> Unit,
+    val onOpenTranslationSettings: () -> Unit
 )
 
-internal fun MainActivity.buildMenuSnapshot(): BrowserMenuSnapshot {
+internal fun MainActivity.buildMenuSnapshot(previous: BrowserMenuSnapshot?): BrowserMenuSnapshot {
     val position = prefs.getString("address_bar_position", "top") ?: "top"
     val wv = tabManager.activeTab?.webView
     val currentUrl = wv?.url ?: ""
-    val currentUri = currentUrl.takeIf { it.isNotEmpty() }
-        ?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() }
-    val webClient = wv?.webViewClient as? ClintWebViewClient
-    val appMatches = if (currentUri != null && webClient != null &&
-        (currentUri.scheme == "http" || currentUri.scheme == "https")
-    ) {
-        webClient.resolveAppMatches(currentUri, this)
-    } else emptyList()
-    val openInAppLabel = if (appMatches.size == 1) {
-        getString(R.string.menu_open_in_named_app, appMatches[0].loadLabel(packageManager).toString())
-    } else null
-
-    val exceptionForSite = run {
-        val url = wv?.url ?: return@run false
-        if (!url.startsWith("http://") && !url.startsWith("https://")) return@run false
-        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull() ?: return@run false
-        SitePermissionManager.getState(this, host, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION) != null
-    }
-
-    val dataSaverExceptionForSite = DataSaverSiteException.isExceptedUrl(this, wv?.url)
+    val cachedPage = previous?.takeIf { it.url == currentUrl }?.page
+    val page = BrowserMenuPageState(
+        isBookmarked = currentUrl.isNotEmpty() && uiState.hasActiveUrl && uiState.isBookmarked,
+        isDataSaverExceptionForSite = cachedPage?.isDataSaverExceptionForSite ?: false,
+        isQuiverGuardExceptionForSite = cachedPage?.isQuiverGuardExceptionForSite ?: false,
+        openInAppEnabled = cachedPage?.openInAppEnabled ?: false,
+        openInAppLabel = cachedPage?.openInAppLabel
+    )
 
     return BrowserMenuSnapshot(
+        url = currentUrl,
         showNavRow = position != "split",
         canGoBack = wv?.canGoBack() == true,
         canGoForward = wv?.canGoForward() == true,
-        isBookmarked = currentUrl.isNotEmpty() && BookmarkManager.isBookmarked(this, currentUrl),
+        page = page,
         isLoading = uiState.isPageLoading,
         isDesktopMode = isDesktopMode,
         isDataSaverEnabled = prefs.getBoolean("data_saver_enabled", false),
@@ -194,16 +199,43 @@ internal fun MainActivity.buildMenuSnapshot(): BrowserMenuSnapshot {
         isUserScriptsEnabled = UserScriptState.isEnabled(this),
         isQuiverGuardEnabled = prefs.getBoolean("quiver_guard_enabled", false),
         quiverGuardBlockedCount = tabManager.activeTab?.id?.let { BlockedRequestCounter.getTabCount(it) } ?: 0L,
-        isQuiverGuardExceptionForSite = exceptionForSite,
-        isDataSaverExceptionForSite = dataSaverExceptionForSite,
         isWebsiteBlockerEnabled = prefs.getBoolean("website_blocker_enabled", false),
-        openInAppEnabled = appMatches.isNotEmpty(),
-        openInAppLabel = openInAppLabel,
         canCreateShortcut = currentUrl.isNotEmpty(),
         canUseCookiesControl = tabManager.activeTab?.isIncognito == false &&
             (currentUrl.startsWith("http://") || currentUrl.startsWith("https://")),
+        canTranslatePage = currentUrl.startsWith("http://") || currentUrl.startsWith("https://"),
+        isPageTranslated = (wv as? com.jhaiian.clint.browser.webview.ClintWebView)?.translator?.state?.value?.isRequested == true,
+        canToggleTabMute = (wv as? com.jhaiian.clint.browser.webview.ClintWebView)?.audioState?.let { it.audible || it.muted } == true,
+        isTabMuted = (wv as? com.jhaiian.clint.browser.webview.ClintWebView)?.audioState?.muted == true,
         visibleMenuItems = BrowserMenuCustomizationStore.visibleOrderedItems(prefs)
     )
+}
+
+internal suspend fun MainActivity.loadMenuPageState(url: String): BrowserMenuPageState {
+    val webClient = tabManager.activeTab?.webView?.webViewClient as? ClintWebViewClient
+    val appContext = applicationContext
+    return withContext(Dispatchers.IO) {
+        val uri = url.takeIf { it.isNotEmpty() }?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        val isWebUrl = uri != null && (uri.scheme == "http" || uri.scheme == "https")
+        val appMatches = if (uri != null && webClient != null && isWebUrl) {
+            runCatching { webClient.resolveAppMatches(uri, appContext) }.getOrDefault(emptyList())
+        } else emptyList()
+        val openInAppLabel = if (appMatches.size == 1) {
+            val appLabel = runCatching { appMatches[0].loadLabel(appContext.packageManager).toString() }.getOrNull()
+            appLabel?.let { appContext.getString(R.string.menu_open_in_named_app, it) }
+        } else null
+        val quiverException = isWebUrl && runCatching {
+            val host = uri.host
+            host != null && SitePermissionManager.getState(appContext, host, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION) != null
+        }.getOrDefault(false)
+        BrowserMenuPageState(
+            isBookmarked = url.isNotEmpty() && runCatching { BookmarkManager.isBookmarked(appContext, url) }.getOrDefault(false),
+            isDataSaverExceptionForSite = runCatching { DataSaverSiteException.isExceptedUrl(appContext, url) }.getOrDefault(false),
+            isQuiverGuardExceptionForSite = quiverException,
+            openInAppEnabled = appMatches.isNotEmpty(),
+            openInAppLabel = openInAppLabel
+        )
+    }
 }
 
 internal fun MainActivity.buildMenuActions(dismiss: () -> Unit): BrowserMenuActions = BrowserMenuActions(
@@ -241,7 +273,10 @@ internal fun MainActivity.buildMenuActions(dismiss: () -> Unit): BrowserMenuActi
     onDisableDataSaverForSite = { dismiss(); onMenuDisableDataSaverForSite() },
     onWebsiteBlocker = { dismiss(); onMenuWebsiteBlocker() },
     onOpenWebsiteBlockerSettings = { dismiss(); onMenuOpenWebsiteBlockerSettings() },
-    onCookiesControl = { dismiss(); onMenuCookiesControl() }
+    onToggleTabMute = { dismiss(); onMenuToggleTabMute() },
+    onCookiesControl = { dismiss(); onMenuCookiesControl() },
+    onTranslate = { dismiss(); onMenuTranslate() },
+    onOpenTranslationSettings = { dismiss(); onMenuOpenTranslationSettings() }
 )
 
 @Composable
@@ -254,11 +289,17 @@ internal fun MenuTriggerButton(activity: MainActivity, modifier: Modifier = Modi
     val actions = remember(activity) { activity.buildMenuActions(dismiss = { expanded = false }) }
 
     LaunchedEffect(expanded) {
-        if (expanded) snapshot = activity.buildMenuSnapshot()
+        if (!expanded) return@LaunchedEffect
+        val url = snapshot?.url ?: return@LaunchedEffect
+        val page = activity.loadMenuPageState(url)
+        snapshot = snapshot?.let { current -> if (current.url == url) current.copy(page = page) else current }
     }
 
     Box(modifier = modifier) {
-        IconButton(onClick = { expanded = true }) {
+        IconButton(onClick = {
+            snapshot = activity.buildMenuSnapshot(snapshot)
+            expanded = true
+        }) {
             Icon(
                 imageVector = androidx.compose.material.icons.Icons.Filled.MoreVert,
                 contentDescription = stringResource(R.string.menu),
@@ -368,7 +409,7 @@ private fun BrowserMenuContent(
                     stringResource(R.string.refresh), true, actions.onRefreshOrStop
                 )
                 MenuNavIcon(
-                    if (snapshot.isBookmarked) androidx.compose.material.icons.Icons.Filled.Bookmark else androidx.compose.material.icons.Icons.Filled.BookmarkBorder,
+                    if (snapshot.page.isBookmarked) androidx.compose.material.icons.Icons.Filled.Bookmark else androidx.compose.material.icons.Icons.Filled.BookmarkBorder,
                     stringResource(R.string.content_desc_bookmark), true, actions.onToggleBookmark
                 )
             }
@@ -396,8 +437,8 @@ private fun MenuItemRowFor(item: CustomizableMenuItem, snapshot: BrowserMenuSnap
         CustomizableMenuItem.SHARE -> MenuItemRow(item.icon(), stringResource(item.titleRes()), onClick = actions.onShare)
         CustomizableMenuItem.OPEN_IN_APP -> MenuItemRow(
             item.icon(),
-            snapshot.openInAppLabel ?: stringResource(item.titleRes()),
-            enabled = snapshot.openInAppEnabled,
+            snapshot.page.openInAppLabel ?: stringResource(item.titleRes()),
+            enabled = snapshot.page.openInAppEnabled,
             onClick = actions.onOpenInApp
         )
         CustomizableMenuItem.CREATE_SHORTCUT -> MenuItemRow(
@@ -431,7 +472,7 @@ private fun MenuItemRowFor(item: CustomizableMenuItem, snapshot: BrowserMenuSnap
             item.icon(),
             stringResource(item.titleRes()),
             checked = snapshot.isQuiverGuardEnabled,
-            badge = if (snapshot.isQuiverGuardEnabled && !snapshot.isQuiverGuardExceptionForSite && snapshot.quiverGuardBlockedCount > 0L) {
+            badge = if (snapshot.isQuiverGuardEnabled && !snapshot.page.isQuiverGuardExceptionForSite && snapshot.quiverGuardBlockedCount > 0L) {
                 BlockedRequestCounter.formatCount(snapshot.quiverGuardBlockedCount)
             } else null,
             onClick = actions.onQuiverGuard,
@@ -440,7 +481,7 @@ private fun MenuItemRowFor(item: CustomizableMenuItem, snapshot: BrowserMenuSnap
         CustomizableMenuItem.DISABLE_QUIVER_GUARD_FOR_SITE -> MenuItemRow(
             item.icon(),
             stringResource(item.titleRes()),
-            checked = snapshot.isQuiverGuardExceptionForSite,
+            checked = snapshot.page.isQuiverGuardExceptionForSite,
             onClick = actions.onDisableQuiverGuardForSite,
             onLongClick = actions.onOpenQuiverGuardSiteSettings
         )
@@ -454,6 +495,14 @@ private fun MenuItemRowFor(item: CustomizableMenuItem, snapshot: BrowserMenuSnap
         CustomizableMenuItem.BOOKMARKS -> MenuItemRow(item.icon(), stringResource(item.titleRes()), onClick = actions.onBookmarks)
         CustomizableMenuItem.HISTORY -> MenuItemRow(item.icon(), stringResource(item.titleRes()), onClick = actions.onHistory)
         CustomizableMenuItem.READER_MODE -> MenuItemRow(item.icon(), stringResource(item.titleRes()), onClick = actions.onReaderMode)
+        CustomizableMenuItem.TRANSLATE -> MenuItemRow(
+            item.icon(),
+            stringResource(item.titleRes()),
+            enabled = snapshot.canTranslatePage,
+            checked = snapshot.isPageTranslated,
+            onClick = actions.onTranslate,
+            onLongClick = actions.onOpenTranslationSettings
+        )
         CustomizableMenuItem.DESKTOP_MODE -> MenuItemRow(
             item.icon(),
             stringResource(item.titleRes()),
@@ -471,10 +520,17 @@ private fun MenuItemRowFor(item: CustomizableMenuItem, snapshot: BrowserMenuSnap
         CustomizableMenuItem.DISABLE_DATA_SAVER_FOR_SITE -> MenuItemRow(
             item.icon(),
             stringResource(item.titleRes()),
-            checked = snapshot.isDataSaverExceptionForSite,
+            checked = snapshot.page.isDataSaverExceptionForSite,
             onClick = actions.onDisableDataSaverForSite,
             onLongClick = actions.onOpenDataSaverSiteSettings
         )
+        CustomizableMenuItem.MUTE_TAB -> if (snapshot.canToggleTabMute) {
+            MenuItemRow(
+                if (snapshot.isTabMuted) androidx.compose.material.icons.Icons.AutoMirrored.Filled.VolumeUp else item.icon(),
+                stringResource(if (snapshot.isTabMuted) R.string.menu_unmute_tab else item.titleRes()),
+                onClick = actions.onToggleTabMute
+            )
+        }
         CustomizableMenuItem.COOKIES_CONTROL -> MenuItemRow(
             item.icon(),
             stringResource(item.titleRes()),

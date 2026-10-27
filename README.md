@@ -10,8 +10,8 @@ Lightweight browser with ADM, ad blocking, media capture, and multi-profile supp
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blueviolet.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-blueviolet.svg)](https://developer.android.com)
-[![Stable](https://img.shields.io/badge/Stable-1.2.3-blueviolet.svg)](https://github.com/jhaiian/ClintBrowser/releases/tag/v1.2.3)
-[![Beta](https://img.shields.io/badge/Beta-1.2.3-blueviolet.svg)](https://github.com/jhaiian/ClintBrowser/releases/tag/v1.2.3)
+[![Stable](https://img.shields.io/badge/Stable-1.2.5-blueviolet.svg)](https://github.com/jhaiian/ClintBrowser/releases/tag/v1.2.5)
+[![Beta](https://img.shields.io/badge/Beta-1.2.5-blueviolet.svg)](https://github.com/jhaiian/ClintBrowser/releases/tag/v1.2.5)
 [![Downloads](https://img.shields.io/github/downloads/jhaiian/ClintBrowser/total?color=blueviolet)](https://github.com/jhaiian/ClintBrowser/releases)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Yes-blueviolet.svg)](https://github.com/jhaiian/ClintBrowser)
 
@@ -27,7 +27,7 @@ We respect your privacy, so the app doesn't collect any kind of data. We don't e
 
 Clint Browser's goal is to create an Android browser that does more while being pleasant to look at and highly customizable, with no ads and no paywalls. Clint Browser is completely free to use.
 
-Looking for a Firefox-based version with extensions and background playback? Check out [Clint Gecko](https://github.com/jhaiian/ClintGecko), the official fork of Clint Browser built on GeckoView.
+Looking for a Firefox-based version with extension support? Check out [Clint Gecko](https://github.com/jhaiian/ClintGecko), the official fork of Clint Browser built on GeckoView.
 
 Built and maintained by **[@jhaiian](https://github.com/jhaiian)** — a solo developer from the Philippines 🇵🇭
 

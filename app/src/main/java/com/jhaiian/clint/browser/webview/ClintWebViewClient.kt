@@ -46,10 +46,14 @@ class ClintWebViewClient(
     private val isCustomSslWarningEnabled: () -> Boolean = { false },
     private val onSslWarning: (SslWarningRequest) -> Unit = {},
     private val isIncognito: () -> Boolean = { false },
-    private val onHttpsOnlyBlocked: (HttpsOnlyRequest) -> Unit = {}
+    private val onHttpsOnlyBlocked: (HttpsOnlyRequest) -> Unit = {},
+    private val onQuiverGuardDocumentBlocked: (String) -> Unit = {}
 ) : WebViewClient() {
 
     private val allowedSslErrors = mutableSetOf<String>()
+
+    fun hasSslException(host: String): Boolean =
+        allowedSslErrors.any { it.substringBefore('|').equals(host, ignoreCase = true) }
 
     @Volatile private var cachedPageUrl: String? = null
 
@@ -59,27 +63,31 @@ class ClintWebViewClient(
     private val upgradedHostOrigins = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val ipv4Regex = Regex("""^(\d{1,3}\.){3}\d{1,3}$""")
 
-    @Volatile private var exceptionCacheHost: String? = null
-    @Volatile private var exceptionCacheValid: Boolean = false
-    @Volatile private var exceptionCacheState: Boolean = false
-    private val exceptionCacheLock = Any()
+    @Volatile private var quiverGuardPageUrl: String? = null
+
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    @Volatile private var exceptionCache: Pair<String, Boolean>? = null
 
     companion object {
         private const val COOLDOWN_MS = 4000L
     }
 
     private fun isQuiverGuardExcepted(context: android.content.Context, pageHost: String): Boolean {
-        if (exceptionCacheValid && exceptionCacheHost == pageHost) return exceptionCacheState
-        synchronized(exceptionCacheLock) {
-            if (exceptionCacheValid && exceptionCacheHost == pageHost) return exceptionCacheState
-            val state = SitePermissionManager.getState(
-                context, pageHost, SitePermissionDatabase.TYPE_QUIVER_GUARD_EXCEPTION
-            ) != null
-            exceptionCacheHost = pageHost
-            exceptionCacheState = state
-            exceptionCacheValid = true
-            return state
-        }
+        exceptionCache?.let { (host, state) -> if (host == pageHost) return state }
+        val state = QuiverGuardWebIntegration.isExcepted(context, pageHost)
+        exceptionCache = pageHost to state
+        return state
+    }
+
+    private fun quiverGuardCookieManager(): android.webkit.CookieManager? =
+        if (isIncognito()) null else com.jhaiian.clint.profiles.WebProfiles.cookieManager(
+            com.jhaiian.clint.profiles.WebProfiles.profileOfTab(getTabId())
+        )
+
+    private fun quiverGuardRewrite(view: WebView, url: String): String? {
+        if (!prefs.getBoolean(QuiverGuardWebIntegration.PREF_ENABLED, false)) return null
+        return QuiverGuardWebIntegration.mainFrameRewrite(view.context.applicationContext, url)
     }
 
     fun upgradeForHttpsOnly(url: String): String {
@@ -114,11 +122,13 @@ class ClintWebViewClient(
     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
         cachedPageUrl = url
+        quiverGuardPageUrl = url
         MediaCaptureStore.updatePageUrl(getTabId(), url)
         pendingHeaderLoad = null
 
-        exceptionCacheValid = false
+        exceptionCache = null
         MediaCaptureStore.clearForTab(getTabId())
+        (view as? ClintWebView)?.translator?.onPageStarted(url)
         if (isActive()) onPageStartedCallback(url)
     }
 
@@ -129,12 +139,15 @@ class ClintWebViewClient(
         DataSaverCacheMode.reset(view, isIncognito())
         MediaCaptureStore.updatePageUrl(getTabId(), url)
         onTabUrlUpdatedCallback(view, url)
+        (view as? ClintWebView)?.reapplyAudioMute()
+        (view as? ClintWebView)?.translator?.onPageFinished(url)
         if (isActive()) onPageFinishedCallback(url) else view.evaluateJavascript(TabMediaControl.PAUSE_SCRIPT, null)
     }
 
     override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
         super.doUpdateVisitedHistory(view, url, isReload)
         cachedPageUrl = url
+        quiverGuardPageUrl = url
         MediaCaptureStore.updatePageUrl(getTabId(), url)
         MediaCaptureStore.clearForTab(getTabId())
         onTabUrlUpdatedCallback(view, url)
@@ -174,6 +187,15 @@ class ClintWebViewClient(
             if (cleaned != original) {
                 val headers = getDesktopHeaders()
                 if (headers != null) view.loadUrl(cleaned, headers) else view.loadUrl(cleaned)
+                return true
+            }
+        }
+
+        if (request.isForMainFrame && request.method.equals("GET", ignoreCase = true)) {
+            val rewritten = quiverGuardRewrite(view, uri.toString())
+            if (rewritten != null) {
+                val headers = getDesktopHeaders()
+                if (headers != null) view.loadUrl(rewritten, headers) else view.loadUrl(rewritten)
                 return true
             }
         }
@@ -455,9 +477,11 @@ class ClintWebViewClient(
             }
         }
 
-        val quiverGuardEnabled = prefs.getBoolean("quiver_guard_enabled", false)
+        val quiverGuardEnabled = prefs.getBoolean(QuiverGuardWebIntegration.PREF_ENABLED, false)
         if (quiverGuardEnabled) {
-            val pageHost = cachedPageUrl?.let {
+            val pageUrl = if (request.isForMainFrame) request.url.toString() else quiverGuardPageUrl
+            if (request.isForMainFrame) quiverGuardPageUrl = pageUrl
+            val pageHost = pageUrl?.let {
                 runCatching { android.net.Uri.parse(it).host }.getOrNull()
             }
             val isExcepted = pageHost != null && isQuiverGuardExcepted(view.context.applicationContext, pageHost)
@@ -465,9 +489,16 @@ class ClintWebViewClient(
                 val blocked = QuiverGuardWebIntegration.shouldInterceptRequest(
                     context = view.context.applicationContext,
                     request = request,
-                    pageUrl = cachedPageUrl,
+                    pageUrl = pageUrl,
                     tabId = getTabId(),
-                    isQuiverGuardEnabled = true
+                    cookieManager = quiverGuardCookieManager(),
+                    onMainFrameRewrite = { rewritten ->
+                        mainHandler.post {
+                            val headers = getDesktopHeaders()
+                            if (headers != null) view.loadUrl(rewritten, headers) else view.loadUrl(rewritten)
+                        }
+                    },
+                    onDocumentBlocked = { blockedUrl -> mainHandler.post { onQuiverGuardDocumentBlocked(blockedUrl) } }
                 )
                 if (blocked != null) return blocked
             }
