@@ -448,6 +448,7 @@ class ClintWebViewClient(
         request: WebResourceRequest
     ): WebResourceResponse? {
         if (request.url.host == null) return super.shouldInterceptRequest(view, request)
+        HttpTrafficInspector.recordRequest(request)
 
         if (request.url.host == CLINT_HOME_HOST) return serveClintHome(view.context.applicationContext, request.url)
 
@@ -522,6 +523,11 @@ class ClintWebViewClient(
                 onCancel = { handler.cancel() }
             )
         )
+    }
+
+    override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
+        super.onReceivedHttpError(view, request, errorResponse)
+        HttpTrafficInspector.recordHttpError(request, errorResponse)
     }
 
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
