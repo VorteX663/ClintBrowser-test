@@ -36,7 +36,7 @@ object HttpTrafficInspector {
         val uri = request.url ?: return
         if (uri.scheme != "http" && uri.scheme != "https") return
         val safeUrl = Uri.Builder().scheme(uri.scheme).authority(uri.encodedAuthority)
-            .path(uri.encodedPath).build().toString()
+            .encodedPath(uri.encodedPath).build().toString()
         val headers = request.requestHeaders.entries
             .filter { it.key.lowercase() in safeRequestHeaders }
             .map { "${it.key}: ${it.value.take(180)}" }
