@@ -1,4 +1,4 @@
-name: Build Clint Browser ARM64
+name: Build Clint Browser ARM64 Test APK
 
 on:
   workflow_dispatch:
@@ -31,7 +31,7 @@ jobs:
       - name: Provision Gradle Wrapper JAR
         if: steps.cache-wrapper-jar.outputs.cache-hit != 'true'
         run: |
-          GRADLE_VERSION=$(grep -oP '(?<=gradle-)[0-9]+\.[0-9]+(\.[0-9]+)?(?=-bin\.zip)' gradle/wrapper/gradle-wrapper.properties)
+          GRADLE_VERSION=$(grep -oP '(?<=gradle-)[0-9]+\\.[0-9]+(\\.[0-9]+)?(?=-bin\\.zip)' gradle/wrapper/gradle-wrapper.properties)
           cp gradle/wrapper/gradle-wrapper.properties /tmp/gradle-wrapper.properties.bak
           curl -fL -o /tmp/gradle-bin.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
           unzip -q /tmp/gradle-bin.zip -d /tmp/gradle-dist
@@ -41,24 +41,23 @@ jobs:
       - name: Grant Execute Permission for gradlew
         run: chmod +x gradlew
 
-      - name: Decode Signing Keystore
-        run: |
-          printf '%s' "${{ secrets.BASE_64_SIGNING_KEY }}" | tr -d '\n' | base64 -d > app/release_keystore.jks
-
       - name: Create local.properties
-        run: printf '%s\n' "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
+        run: printf '%s\\n' "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
 
-      - name: Build GitHub Release APKs
-        run: ./gradlew assembleGithubRelease
+      # Debug variants are automatically signed with Android's debug key.
+      # The .debug application ID suffix allows this test build to coexist
+      # with the regular Clint Browser installation.
+      - name: Build signed GitHub debug APK
+        run: ./gradlew assembleGithubDebug
 
-      - name: List generated APKs
+      - name: List and verify generated APKs
         run: |
-          find app/build/outputs/apk -type f -name "*.apk" -print | sort
-          test -n "$(find app/build/outputs/apk/github/release -type f -name "*.apk" -print -quit)"
+          find app/build/outputs/apk/github/debug -type f -name "*.apk" -print | sort
+          test -n "$(find app/build/outputs/apk/github/debug -type f -name "*.apk" -print -quit)"
 
-      - name: Upload test APKs
+      - name: Upload installable test APKs
         uses: actions/upload-artifact@v7
         with:
-          name: Clint-GitHub-release-test-apks
-          path: app/build/outputs/apk/github/release/*.apk
+          name: Clint-GitHub-debug-test-apks
+          path: app/build/outputs/apk/github/debug/*.apk
           if-no-files-found: error
