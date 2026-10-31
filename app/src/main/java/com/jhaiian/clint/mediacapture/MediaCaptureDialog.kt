@@ -89,6 +89,7 @@ fun MediaCaptureDialog(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val detectedItems by MediaCaptureStore.observe(tabId).collectAsState()
+    val diagnosticItems by MediaCaptureDiagnostics.items.collectAsState()
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
     var convertTsToMp4 by remember { mutableStateOf(prefs.getBoolean(MEDIA_CAPTURE_CONVERT_TS_TO_MP4_PREF, MEDIA_CAPTURE_CONVERT_TS_TO_MP4_DEFAULT)) }
 
@@ -120,6 +121,19 @@ fun MediaCaptureDialog(
             MediaCaptureConvertTsRow(convertTsToMp4) { checked ->
                 convertTsToMp4 = checked
                 prefs.edit().putBoolean(MEDIA_CAPTURE_CONVERT_TS_TO_MP4_PREF, checked).apply()
+            }
+            if (diagnosticItems.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Text("Recent network requests (safe diagnostics)", color = colors.popupText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    diagnosticItems.takeLast(8).asReversed().forEach { item ->
+                        Text(
+                            "${item.host}  •  ${item.method}  •  ${item.destination}  •  .${item.extension}  •  ${item.acceptHint}",
+                            color = colors.secondaryText, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
+                    }
+                }
+                HorizontalDivider(color = colors.popupStroke)
             }
             if (detectedItems.isEmpty()) {
                 MediaCaptureEmptyState()
