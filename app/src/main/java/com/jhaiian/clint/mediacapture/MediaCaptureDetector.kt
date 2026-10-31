@@ -88,9 +88,15 @@ object MediaCaptureDetector {
         if (scheme != "http" && scheme != "https") return
 
         val urlString = uri.toString()
-        if (!MediaCaptureStore.markSeen(tabId, urlString)) return
-
         val path = uri.path?.lowercase() ?: ""
+        val requestHeaders = request.requestHeaders
+        val requestDest = requestHeaders.entries.firstOrNull { it.key.equals("Sec-Fetch-Dest", true) }?.value ?: "unknown"
+        val requestAccept = requestHeaders.entries.firstOrNull { it.key.equals("Accept", true) }?.value ?: ""
+        MediaCaptureDiagnostics.record(
+            uri.host ?: "unknown", method ?: "GET", requestDest,
+            path.substringAfterLast('.', "").ifBlank { "none" }, requestAccept
+        )
+        if (!MediaCaptureStore.markSeen(tabId, urlString)) return
         var ext = path.substringAfterLast('.', "")
         if (!knownMediaExtension(ext)) {
             extensionFromQuery(uri)?.let { ext = it }
