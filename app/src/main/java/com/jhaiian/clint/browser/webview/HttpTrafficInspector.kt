@@ -29,7 +29,7 @@ object HttpTrafficInspector {
     private val mutableEntries = MutableStateFlow<List<HttpTrafficEntry>>(emptyList())
     val entries = mutableEntries.asStateFlow()
 
-    private val safeRequestHeaders = setOf("accept", "content-type", "origin", "sec-fetch-dest", "sec-fetch-mode")
+    private val safeRequestHeaders = setOf("accept", "content-type", "origin", "referer", "sec-fetch-dest", "sec-fetch-mode")
 
     @Synchronized
     fun recordRequest(request: WebResourceRequest) {
@@ -39,7 +39,16 @@ object HttpTrafficInspector {
             .encodedPath(uri.encodedPath).build().toString()
         val headers = request.requestHeaders.entries
             .filter { it.key.lowercase() in safeRequestHeaders }
-            .map { "${it.key}: ${it.value.take(180)}" }
+            .map { entry ->
+                val value = if (entry.key.equals("Referer", ignoreCase = true)) {
+                    runCatching {
+                        val ref = Uri.parse(entry.value)
+                        Uri.Builder().scheme(ref.scheme).authority(ref.encodedAuthority)
+                            .encodedPath(ref.encodedPath).build().toString()
+                    }.getOrDefault("")
+                } else entry.value
+                "${entry.key}: ${value.take(180)}"
+            }
         add(HttpTrafficEntry(
             id = ++nextId,
             url = safeUrl.take(1200),
