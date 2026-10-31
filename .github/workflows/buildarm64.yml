@@ -52,11 +52,13 @@ jobs:
         run: ./gradlew assembleGithubRelease
 
       - name: List generated APKs
-        run: find app/build/outputs/apk/github/release -name "*.apk" | sort
+        run: |
+          find app/build/outputs/apk -type f -name "*.apk" -print | sort
+          test -n "$(find app/build/outputs/apk/github/release -type f -name "*.apk" -print -quit)"
 
-      - name: Upload arm64-v8a APK
+      - name: Upload test APKs
         uses: actions/upload-artifact@v7
         with:
-          name: Clint-arm64-v8a
-          path: app/build/outputs/apk/github/release/app-github-arm64-v8a-release.apk
+          name: Clint-GitHub-release-test-apks
+          path: app/build/outputs/apk/github/release/*.apk
           if-no-files-found: error
