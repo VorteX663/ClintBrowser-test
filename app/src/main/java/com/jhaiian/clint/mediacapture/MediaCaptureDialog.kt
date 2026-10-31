@@ -143,30 +143,34 @@ fun MediaCaptureDialog(
                         Text("HTTP traffic inspector", color = colors.popupText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Text("Clear", color = colors.primary, fontSize = 11.sp, modifier = Modifier.clickable { HttpTrafficInspector.clear() }.padding(6.dp))
                     }
-                    trafficItems.takeLast(12).asReversed().forEach { entry ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("${entry.method}  ${entry.url}", color = colors.secondaryText, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    buildString {
-                                        append(entry.destination)
-                                        entry.statusCode?.let { append("  •  HTTP ").append(it) }
-                                        entry.responseType?.let { append("  •  ").append(it) }
-                                        entry.error?.let { append("  •  ").append(it) }
-                                        if (entry.requestHeaders.isNotEmpty()) append("  •  ").append(entry.requestHeaders.joinToString("; "))
-                                    },
-                                    color = colors.secondaryText, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            IconButton(onClick = { onCopyLink(entry.url) }) {
-                                Icon(
-                                    imageVector = Icons.Filled.ContentCopy,
-                                    contentDescription = "Copy URL",
-                                    tint = colors.primary
-                                )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
+                    ) {
+                        items(trafficItems.takeLast(12).asReversed()) { entry ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("${entry.method}  ${entry.url}", color = colors.secondaryText, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        buildString {
+                                            append(entry.destination)
+                                            entry.statusCode?.let { append("  •  HTTP ").append(it) }
+                                            entry.responseType?.let { append("  •  ").append(it) }
+                                            entry.error?.let { append("  •  ").append(it) }
+                                            if (entry.requestHeaders.isNotEmpty()) append("  •  ").append(entry.requestHeaders.joinToString("; "))
+                                        },
+                                        color = colors.secondaryText, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                IconButton(onClick = { onCopyLink(entry.url) }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.ContentCopy,
+                                        contentDescription = "Copy URL",
+                                        tint = colors.primary
+                                    )
+                                }
                             }
                         }
                     }
