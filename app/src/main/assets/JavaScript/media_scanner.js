@@ -26,13 +26,13 @@
     var timer = 0;
     var sentCount = 0;
 
-    function absolute(u) {
+    function absolute(u, base) {
       if (!u) return null;
       var s = String(u).trim();
       if (!s || s.length > 4096) return null;
       if (/^(blob|data|javascript|mediasource|about):/i.test(s)) return null;
       try {
-        var r = new URL(s, document.baseURI);
+        var r = new URL(s, base || document.baseURI);
         return r.protocol === "http:" || r.protocol === "https:" ? r.href.split("#")[0] : null;
       } catch (e) { return null; }
     }
@@ -57,9 +57,9 @@
       return s.length > 40 ? "" : s;
     }
 
-    function add(out, raw, hint, label, lang) {
+    function add(out, raw, hint, label, lang, base) {
       if (sentCount + out.length >= MAX_ITEMS) return;
-      var u = absolute(raw);
+      var u = absolute(raw, base);
       if (!u || u === location.href || sent.has(u)) return;
       sent.add(u);
       out.push({ u: u, t: kindOf(u, hint), l: cleanLabel(label), g: lang ? String(lang).slice(0, 16) : "" });
@@ -74,16 +74,16 @@
         .replace(/&amp;/g, "&");
     }
 
-    function scanText(out, text, quoted) {
+    function scanText(out, text, quoted, base) {
       if (!text || text.indexOf(".") < 0) return;
       var t = normalize(text);
       var m;
       ABS_RE.lastIndex = 0;
-      while ((m = ABS_RE.exec(t)) !== null) add(out, m[0], "", "", "");
+      while ((m = ABS_RE.exec(t)) !== null) add(out, m[0], "", "", "", base);
       if (!quoted) return;
       QUOTED_RE.lastIndex = 0;
       while ((m = QUOTED_RE.exec(t)) !== null) {
-        if (m[1].indexOf("/") >= 0) add(out, m[1], "", "", "");
+        if (m[1].indexOf("/") >= 0) add(out, m[1], "", "", "", base);
       }
     }
 
@@ -193,6 +193,68 @@
         budget -= text.length;
         scanText(out, text, true);
       }
+    }
+
+
+    function reportResponseText(text, baseUrl) {
+      if (!text || typeof text !== "string" || text.length > 512 * 1024) return;
+      var out = [];
+      try { scanText(out, text, true, baseUrl || document.baseURI); } catch (e) {}
+      report(out);
+    }
+
+    function installNetworkHooks() {
+      try {
+        if (typeof window.fetch === "function" && !window.fetch.__clintMediaHook) {
+          var originalFetch = window.fetch;
+          var hookedFetch = function () {
+            var result = originalFetch.apply(this, arguments);
+            try {
+              result.then(function (response) {
+                if (!response || !response.ok) return;
+                var type = (response.headers && response.headers.get("content-type") || "").toLowerCase();
+                if (type.indexOf("json") < 0 && type.indexOf("text/") < 0 &&
+                    type.indexOf("javascript") < 0 && type.indexOf("xml") < 0) return;
+                response.clone().text().then(function (body) {
+                  reportResponseText(body, response.url);
+                }).catch(function () {});
+              }).catch(function () {});
+            } catch (e) {}
+            return result;
+          };
+          hookedFetch.__clintMediaHook = true;
+          window.fetch = hookedFetch;
+        }
+      } catch (e) {}
+
+      try {
+        var proto = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
+        if (proto && !proto.__clintMediaHook) {
+          var originalOpen = proto.open;
+          var originalSend = proto.send;
+          proto.open = function (method, url) {
+            try { this.__clintMediaRequestUrl = new URL(String(url), document.baseURI).href; } catch (e) {}
+            return originalOpen.apply(this, arguments);
+          };
+          proto.send = function () {
+            try {
+              var xhr = this;
+              xhr.addEventListener("loadend", function () {
+                try {
+                  if (xhr.responseType && xhr.responseType !== "text" && xhr.responseType !== "json") return;
+                  var type = (xhr.getResponseHeader("content-type") || "").toLowerCase();
+                  if (type.indexOf("json") < 0 && type.indexOf("text/") < 0 &&
+                      type.indexOf("javascript") < 0 && type.indexOf("xml") < 0) return;
+                  var body = xhr.responseType === "json" ? JSON.stringify(xhr.response) : xhr.responseText;
+                  reportResponseText(body, xhr.responseURL || xhr.__clintMediaRequestUrl);
+                } catch (e) {}
+              }, { once: true });
+            } catch (e) {}
+            return originalSend.apply(this, arguments);
+          };
+          proto.__clintMediaHook = true;
+        }
+      } catch (e) {}
     }
 
     function scanPerformanceResources(out) {
@@ -317,6 +379,7 @@
     }
 
     function start() {
+      installNetworkHooks();
       scan(true);
       watch();
       setTimeout(function () { scan(true); }, 2500);
