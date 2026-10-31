@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.preference.PreferenceManager
 import com.jhaiian.clint.R
+import com.jhaiian.clint.browser.webview.HttpTrafficInspector
 import com.jhaiian.clint.downloads.formatElapsed
 import com.jhaiian.clint.ui.ClintCheckbox
 import com.jhaiian.clint.ui.ClintDialogStatusBarEffect
@@ -90,6 +91,7 @@ fun MediaCaptureDialog(
     val configuration = LocalConfiguration.current
     val detectedItems by MediaCaptureStore.observe(tabId).collectAsState()
     val diagnosticItems by MediaCaptureDiagnostics.items.collectAsState()
+    val trafficItems by HttpTrafficInspector.entries.collectAsState()
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
     var convertTsToMp4 by remember { mutableStateOf(prefs.getBoolean(MEDIA_CAPTURE_CONVERT_TS_TO_MP4_PREF, MEDIA_CAPTURE_CONVERT_TS_TO_MP4_DEFAULT)) }
 
@@ -131,6 +133,30 @@ fun MediaCaptureDialog(
                             color = colors.secondaryText, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 3.dp)
                         )
+                    }
+                }
+                HorizontalDivider(color = colors.popupStroke)
+            }
+            if (trafficItems.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("HTTP traffic inspector", color = colors.popupText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text("Clear", color = colors.primary, fontSize = 11.sp, modifier = Modifier.clickable { HttpTrafficInspector.clear() }.padding(6.dp))
+                    }
+                    trafficItems.takeLast(12).asReversed().forEach { entry ->
+                        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Text("${entry.method}  ${entry.url}", color = colors.secondaryText, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                buildString {
+                                    append(entry.destination)
+                                    entry.statusCode?.let { append("  •  HTTP ").append(it) }
+                                    entry.responseType?.let { append("  •  ").append(it) }
+                                    entry.error?.let { append("  •  ").append(it) }
+                                    if (entry.requestHeaders.isNotEmpty()) append("  •  ").append(entry.requestHeaders.joinToString("; "))
+                                },
+                                color = colors.secondaryText, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
                 HorizontalDivider(color = colors.popupStroke)
