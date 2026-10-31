@@ -195,6 +195,22 @@
       }
     }
 
+    function scanPerformanceResources(out) {
+      try {
+        var entries = performance.getEntriesByType("resource") || [];
+        var start = Math.max(0, entries.length - 1000);
+        for (var i = start; i < entries.length; i++) {
+          var name = entries[i] && entries[i].name;
+          if (!name || typeof name !== "string") continue;
+          var u = absolute(name);
+          if (!u) continue;
+          var path = "";
+          try { path = new URL(u).pathname; } catch (e) {}
+          if (/\\.(m3u8|mpd)$/i.test(path)) add(out, u, "", "", "");
+        }
+      } catch (e) {}
+    }
+
     function readProp(obj, name) {
       try { return obj ? obj[name] : undefined; } catch (e) { return undefined; }
     }
@@ -268,7 +284,7 @@
           scanLinks(out, list[i]);
           scanDataAttributes(out, list[i]);
         }
-        scanScripts(out);
+        scanPerformanceResources(out);\n        scanScripts(out);
         scanPlayers(out);
       } catch (e) {}
       report(out);
