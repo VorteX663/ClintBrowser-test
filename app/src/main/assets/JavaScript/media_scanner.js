@@ -241,11 +241,12 @@
               var xhr = this;
               xhr.addEventListener("loadend", function () {
                 try {
-                  if (xhr.responseType && xhr.responseType !== "text") return;
+                  if (xhr.responseType && xhr.responseType !== "text" && xhr.responseType !== "json") return;
                   var type = (xhr.getResponseHeader("content-type") || "").toLowerCase();
                   if (type.indexOf("json") < 0 && type.indexOf("text/") < 0 &&
                       type.indexOf("javascript") < 0 && type.indexOf("xml") < 0) return;
-                  reportResponseText(xhr.responseText, xhr.responseURL || xhr.__clintMediaRequestUrl);
+                  var body = xhr.responseType === "json" ? JSON.stringify(xhr.response) : xhr.responseText;
+                  reportResponseText(body, xhr.responseURL || xhr.__clintMediaRequestUrl);
                 } catch (e) {}
               }, { once: true });
             } catch (e) {}
