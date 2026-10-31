@@ -284,7 +284,8 @@
           scanLinks(out, list[i]);
           scanDataAttributes(out, list[i]);
         }
-        scanPerformanceResources(out);\n        scanScripts(out);
+        scanPerformanceResources(out);
+        scanScripts(out);
         scanPlayers(out);
       } catch (e) {}
       report(out);
